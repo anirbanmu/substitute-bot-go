@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"time"
-	// "fmt"
 )
 
 var _ = Describe("Reddit", func() {

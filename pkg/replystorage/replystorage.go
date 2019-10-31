@@ -1,7 +1,6 @@
 package replystorage
 
 import (
-	// "fmt"
 	"bytes"
 	"github.com/go-redis/redis"
 	"github.com/ugorji/go/codec"
