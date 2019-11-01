@@ -1,7 +1,6 @@
 package reddit
 
 import (
-	"bytes"
 	"encoding/json"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -27,7 +26,6 @@ var _ = Describe("Reddit", func() {
 		"dummy-user-agent",
 	}
 	token := "dummy-access-token"
-	encodeBuffer := bytes.Buffer{}
 
 	BeforeEach(func() {
 		server = ghttp.NewServer()
@@ -47,13 +45,11 @@ var _ = Describe("Reddit", func() {
 		}
 
 		api = &Api{
-			creds:        creds,
-			Client:       client,
-			token:        token,
-			grantTime:    time.Now(),
-			EncodeBuffer: &encodeBuffer,
-			Encoder:      codec.NewEncoder(&encodeBuffer, &codec.JsonHandle{}),
-			Decoder:      codec.NewDecoderBytes(nil, &codec.JsonHandle{}),
+			creds:     creds,
+			Client:    client,
+			token:     token,
+			grantTime: time.Now(),
+			Decoder:   codec.NewDecoderBytes(nil, &codec.JsonHandle{}),
 		}
 	})
 
