@@ -23,3 +23,7 @@ This project uses Go modules so please use a version of Go (>= 1.11) that suppor
 ## Testing
 - Some of the tests utilize [Gingko/Gomega](https://onsi.github.io/ginkgo/)
 - `go test --cover --short ./...`
+
+## Live
+
+You can check out the live running web frontend @ https://substitute-bot.electrostat.xyz

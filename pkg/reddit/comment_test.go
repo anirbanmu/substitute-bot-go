@@ -36,9 +36,9 @@ var _ = Describe("Comment", func() {
 			})
 		})
 
-		Context("when comment body is [deleted]", func() {
+		Context("when comment body is [removed]", func() {
 			It("returns true", func() {
-				comment.Body = "[deleted]"
+				comment.Body = "[removed]"
 				Expect(comment.IsDeleted()).To(BeTrue())
 			})
 		})
