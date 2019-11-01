@@ -18,7 +18,7 @@ const indexTemplate = `<!DOCTYPE html>
     </div>
 
     <div class="content">
-        <p>Substitute-Bot is a combination of a bot for Reddit that provides VIM style search + replace functionality for comments and also a front end web component (what you're reading right now). Written in Ruby utilizing the gems redd + sucker_punch (for the backend bot) & sinatra (for this web frontend). Redis is utilized very lightly for keeping a running list of posted comments.</p>
+        <p>Substitute-Bot is a combination of a bot for Reddit that provides VIM style search + replace functionality for comments and also a front end web component (what you're reading right now). Written in Go. Redis is utilized very lightly for keeping a running list of posted comments.</p>
 
         <p>Syntax is VIM-like - <code>s/SEARCH/REPLACE</code> or <code>s#SEARCH#REPLACE</code>. Post a reply to another comment with this syntax and this bot will process your request & post your requested replacement.</p>
 

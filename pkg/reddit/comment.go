@@ -13,5 +13,5 @@ type Comment struct {
 }
 
 func (c *Comment) IsDeleted() bool {
-	return c.Author == "[deleted]" || c.Body == "[deleted]"
+	return c.Author == "[deleted]" || c.Body == "[removed]"
 }

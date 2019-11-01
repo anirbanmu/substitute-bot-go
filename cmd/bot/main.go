@@ -3,12 +3,13 @@ package main
 import (
 	"github.com/anirbanmu/substitute-bot-go/pkg/reddit"
 	"github.com/anirbanmu/substitute-bot-go/pkg/replystorage"
+	"github.com/anirbanmu/substitute-bot-go/pkg/sse"
 	"github.com/anirbanmu/substitute-bot-go/pkg/substitution"
-	"github.com/r3labs/sse"
 	"github.com/ugorji/go/codec"
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -78,40 +79,45 @@ func processComment(botUser string, comment reddit.Comment, api *reddit.Api, sto
 	}
 }
 
-func processCommentEvents(idx int, counter *atomicCounter, wg *sync.WaitGroup, commentEvents <-chan *sse.Event) {
-	defer wg.Done()
-
-	creds := reddit.Credentials{
-		os.Getenv("SUBSTITUTE_BOT_USERNAME"),
-		os.Getenv("SUBSTITUTE_BOT_PASSWORD"),
-		os.Getenv("SUBSTITUTE_BOT_CLIENT_ID"),
-		os.Getenv("SUBSTITUTE_BOT_CLIENT_SECRET"),
-		os.Getenv("SUBSTITUTE_BOT_USER_AGENT"),
-	}
+func createApiAndStore(creds reddit.Credentials) (*reddit.Api, *replystorage.Store) {
 	api, err := reddit.InitApi(creds, nil)
 	if err != nil {
-		log.Panicf("worker %d - failed to initialize Reddit API: %s", idx, err)
+		log.Panicf("failed to initialize Reddit API: %s", err)
 	}
 
 	store, err := replystorage.NewStore(nil, &codec.CborHandle{})
 	if err != nil {
-		log.Panicf("worker %d - failed to get replystorage.DefaultStore (is redis running? does REDIS_URL need to be set?): %s", idx, err)
+		log.Panicf("failed to get replystorage.DefaultStore (is redis running? does REDIS_URL need to be set?): %s", err)
 	}
+
+	return api, store
+}
+
+func processCommentEvents(idx int, counter *atomicCounter, wg *sync.WaitGroup, botUsername string, api *reddit.Api, store *replystorage.Store, events <-chan sse.Event) {
+	wg.Add(1)
+	defer wg.Done()
 
 	log.Printf("worker %d started", idx)
 
 	comment := reddit.Comment{}
-	decoder := codec.NewDecoderBytes(nil, &codec.JsonHandle{})
+	reader := strings.NewReader("")
+	replacer := strings.NewReplacer("&lt;", "<", "&gt;", ">", "&amp;", "&")
+	decoder := codec.NewDecoder(reader, &codec.JsonHandle{})
 
-	for e := range commentEvents {
+	for e := range events {
+		if e.Event != "rc" {
+			continue
+		}
+
 		counter.incr()
-		decoder.ResetBytes(e.Data)
+
+		reader.Reset(replacer.Replace(string(e.Data)))
 		if err := decoder.Decode(&comment); err != nil {
 			log.Printf("failed to decode json into reddit.Comment: %s", err)
 			continue
 		}
 
-		processComment(creds.Username, comment, api, store)
+		processComment(botUsername, comment, api, store)
 	}
 }
 
@@ -121,36 +127,65 @@ func main() {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
 	// Holds unprocessed comments
-	commentEvents := make(chan *sse.Event, 4096)
+	events := make(chan sse.Event, 4096)
+
+	creds := reddit.Credentials{
+		os.Getenv("SUBSTITUTE_BOT_USERNAME"),
+		os.Getenv("SUBSTITUTE_BOT_PASSWORD"),
+		os.Getenv("SUBSTITUTE_BOT_CLIENT_ID"),
+		os.Getenv("SUBSTITUTE_BOT_CLIENT_SECRET"),
+		os.Getenv("SUBSTITUTE_BOT_USER_AGENT"),
+	}
+
+	var clients [16]struct {
+		api   *reddit.Api
+		store *replystorage.Store
+	}
+
+	for i := 0; i < len(clients); i++ {
+		api, store := createApiAndStore(creds)
+		clients[i].api = api
+		clients[i].store = store
+	}
+
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
 
 	// Will hold total seen comments
 	counter := atomicCounter{}
 
 	// Start comment processors
-	wg := sync.WaitGroup{}
-	defer wg.Wait()
-	for w := 0; w < 16; w++ {
-		wg.Add(1)
-		go processCommentEvents(w, &counter, &wg, commentEvents)
+	for i := 0; i < len(clients); i++ {
+		go processCommentEvents(i, &counter, &wg, creds.Username, clients[i].api, clients[i].store, events)
 	}
 
 	// Heartbeat logger (don't care about waiting for this goroutine to exit)
 	go func() {
 		for {
 			time.Sleep(1 * 60 * time.Second)
-			log.Printf("processed %d comments in total", counter.count())
+			log.Printf("processed %d comments in total. queue length: %d", counter.count(), len(events))
 		}
 	}()
 
 	// Start comment streamer
 	const streamUrl = "http://stream.pushshift.io/?type=comments&filter=author,author_fullname,body,body_html,created_utc,id,name,parent_id,permalink"
-	client := sse.NewClient(streamUrl)
-	client.SubscribeChan("rc", commentEvents)
 
-	// Run till we get a signal
-	<-signals
+	// We give up control of events here
+	cancel, errChan, err := sse.Stream(events, &wg, streamUrl, nil)
+	if err != nil {
+		log.Panicf("stream initialization errored: %s", err)
+	}
+
+	// Run till we get a signal / error from stream
+	select {
+	case <-signals:
+	case e := <-errChan:
+		log.Printf("received error from stream: %s", e)
+	}
 
 	// Clean up
-	client.Unsubscribe(commentEvents)
-	close(commentEvents)
+	cancel()
+	for e := range errChan {
+		log.Printf("received error from stream: %s", e)
+	}
 }
