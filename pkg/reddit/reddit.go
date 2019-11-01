@@ -1,7 +1,7 @@
 package reddit
 
 import (
-	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/ugorji/go/codec"
@@ -29,13 +29,11 @@ type Credentials struct {
 }
 
 type Api struct {
-	creds        Credentials
-	Client       *http.Client
-	token        string
-	grantTime    time.Time
-	EncodeBuffer *bytes.Buffer
-	Encoder      *codec.Encoder
-	Decoder      *codec.Decoder
+	creds     Credentials
+	Client    *http.Client
+	token     string
+	grantTime time.Time
+	Decoder   *codec.Decoder
 }
 
 type basicAuth struct {
@@ -179,10 +177,11 @@ func (api *Api) GetComment(fullname string) (*Comment, error) {
 		} `json:"data"`
 	}{}
 
-	api.Decoder.ResetBytes(res)
-	err = api.Decoder.Decode(&parsed)
-	api.Decoder.ResetBytes(nil)
+	// api.Decoder.ResetBytes(res)
+	// err = api.Decoder.Decode(&parsed)
+	// api.Decoder.ResetBytes(nil)
 
+	err = json.Unmarshal(res, &parsed)
 	if err != nil {
 		return nil, err
 	}
@@ -228,10 +227,11 @@ func (api *Api) PostComment(fullname string, bodyMarkdown string) (*Comment, err
 		} `json:"json"`
 	}{}
 
-	api.Decoder.ResetBytes(res)
-	err = api.Decoder.Decode(&parsed)
-	api.Decoder.ResetBytes(nil)
+	// api.Decoder.ResetBytes(res)
+	// err = api.Decoder.Decode(&parsed)
+	// api.Decoder.ResetBytes(nil)
 
+	err = json.Unmarshal(res, &parsed)
 	if err != nil {
 		return nil, err
 	}
@@ -312,17 +312,12 @@ func InitApi(creds Credentials, client *http.Client) (*Api, error) {
 		return nil, err
 	}
 
-	encodeBuffer := bytes.Buffer{}
-	encoder := codec.NewEncoder(&encodeBuffer, &codec.JsonHandle{})
-
 	return &Api{
-		creds:        creds,
-		Client:       client,
-		token:        token,
-		grantTime:    time.Now(),
-		EncodeBuffer: &encodeBuffer,
-		Encoder:      encoder,
-		Decoder:      codec.NewDecoderBytes(nil, &codec.JsonHandle{}),
+		creds:     creds,
+		Client:    client,
+		token:     token,
+		grantTime: time.Now(),
+		Decoder:   codec.NewDecoderBytes(nil, &codec.JsonHandle{}),
 	}, nil
 }
 
@@ -375,8 +370,9 @@ func auth(creds Credentials, client *http.Client) (string, error) {
 		Token string `json:"access_token"`
 	}{}
 
-	decoder := codec.NewDecoderBytes(res, &codec.JsonHandle{})
-	if err := decoder.Decode(&parsed); err != nil {
+	// decoder := codec.NewDecoderBytes(res, &codec.JsonHandle{})
+	// if err := decoder.Decode(&parsed); err != nil {
+	if err := json.Unmarshal(res, &parsed); err != nil {
 		return "", err
 	}
 

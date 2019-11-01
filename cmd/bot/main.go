@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"github.com/anirbanmu/substitute-bot-go/pkg/reddit"
 	"github.com/anirbanmu/substitute-bot-go/pkg/replystorage"
 	"github.com/anirbanmu/substitute-bot-go/pkg/sse"
@@ -27,7 +28,7 @@ func constructStoredReplyFromPosted(requester string, posted reddit.Comment) rep
 		AuthorFullname: posted.Author,
 		Body:           posted.Body,
 		BodyHtml:       posted.BodyHtml,
-		CreatedUtc:     posted.CreatedUtc,
+		CreatedUtc:     int64(posted.CreatedUtc),
 		Id:             posted.Id,
 		Name:           posted.Name,
 		ParentId:       posted.ParentId,
@@ -100,9 +101,9 @@ func processCommentEvents(idx int, counter *atomicCounter, wg *sync.WaitGroup, b
 	log.Printf("worker %d started", idx)
 
 	comment := reddit.Comment{}
-	reader := strings.NewReader("")
+	// reader := strings.NewReader("")
 	replacer := strings.NewReplacer("&lt;", "<", "&gt;", ">", "&amp;", "&")
-	decoder := codec.NewDecoder(reader, &codec.JsonHandle{})
+	// decoder := codec.NewDecoder(reader, &codec.JsonHandle{})
 
 	for e := range events {
 		if e.Event != "rc" {
@@ -111,8 +112,9 @@ func processCommentEvents(idx int, counter *atomicCounter, wg *sync.WaitGroup, b
 
 		counter.incr()
 
-		reader.Reset(replacer.Replace(string(e.Data)))
-		if err := decoder.Decode(&comment); err != nil {
+		// reader.Reset(replacer.Replace(string(e.Data)))
+		// if err := decoder.Decode(&comment); err != nil {
+		if err := json.Unmarshal([]byte(replacer.Replace(string(e.Data))), &comment); err != nil {
 			log.Printf("failed to decode json into reddit.Comment: %s", err)
 			continue
 		}
