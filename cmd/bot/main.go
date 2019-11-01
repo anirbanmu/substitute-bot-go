@@ -137,15 +137,15 @@ func main() {
 		os.Getenv("SUBSTITUTE_BOT_USER_AGENT"),
 	}
 
-	var processorData [16]struct {
+	var clients [16]struct {
 		api   *reddit.Api
 		store *replystorage.Store
 	}
 
-	for _, p := range processorData {
+	for i := 0; i < len(clients); i++ {
 		api, store := createApiAndStore(creds)
-		p.api = api
-		p.store = store
+		clients[i].api = api
+		clients[i].store = store
 	}
 
 	wg := sync.WaitGroup{}
@@ -155,8 +155,8 @@ func main() {
 	counter := atomicCounter{}
 
 	// Start comment processors
-	for w := 0; w < 16; w++ {
-		go processCommentEvents(w, &counter, &wg, creds.Username, processorData[w].api, processorData[w].store, events)
+	for i := 0; i < len(clients); i++ {
+		go processCommentEvents(i, &counter, &wg, creds.Username, clients[i].api, clients[i].store, events)
 	}
 
 	// Heartbeat logger (don't care about waiting for this goroutine to exit)
