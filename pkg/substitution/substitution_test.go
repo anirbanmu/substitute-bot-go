@@ -66,6 +66,7 @@ func TestSubstitutionCommandRun(t *testing.T) {
 		err bool
 	}{
 		{"text", SubstitutionCommand{"ex", "ex"}, "", true},
+		{"text", SubstitutionCommand{"f", "g"}, "", true},
 		{"text beep", SubstitutionCommand{"ext bee", "t e"}, "tt ep", false},
 		{"text", SubstitutionCommand{`\w+`, "blah"}, "blah", false}, // Accepts actual regexp
 		{"23", SubstitutionCommand{`(\d)`, `<$1>`}, "<2><3>", false},
