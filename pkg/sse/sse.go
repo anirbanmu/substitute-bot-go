@@ -9,6 +9,7 @@ import (
 	"sync"
 )
 
+// Event represents a received SSE
 type Event struct {
 	Event string
 	ID    string
@@ -51,7 +52,11 @@ func (e *Event) addDataFromLine(line string) (bool, error) {
 	}
 }
 
-// Takes ownership of eventChan (will handle closing)
+/*
+Stream starts the streaming of server sent events into the eventChan
+
+It takes ownership of eventChan (will handle closing)
+*/
 func Stream(eventChan chan<- Event, wg *sync.WaitGroup, url string, client *http.Client) (context.CancelFunc, <-chan error, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	errChan := make(chan error, 1)

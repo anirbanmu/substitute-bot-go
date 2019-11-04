@@ -12,6 +12,7 @@ const (
 	repliesKey = "substitute-bot-go:comments"
 )
 
+// Store represents a reply store that can be used to store/retrieve replies
 type Store struct {
 	Client       *redis.Client
 	EncodeBuffer *bytes.Buffer
@@ -38,6 +39,7 @@ func defaultCodecHandle() codec.Handle {
 	return &codec.JsonHandle{}
 }
 
+// NewStore creates a new Store with provided redis client & codec
 func NewStore(client *redis.Client, handle codec.Handle) (*Store, error) {
 	if client == nil {
 		client = defaultRedisClient()
@@ -64,10 +66,12 @@ func NewStore(client *redis.Client, handle codec.Handle) (*Store, error) {
 	}, nil
 }
 
+// DefaultStore creates a store with defaults (default redis & json)
 func DefaultStore() (*Store, error) {
 	return NewStore(defaultRedisClient(), defaultCodecHandle())
 }
 
+// Add pesists a Reply to the store
 func (s *Store) Add(reply Reply) (int64, error) {
 	s.EncodeBuffer.Reset()
 
@@ -78,6 +82,7 @@ func (s *Store) Add(reply Reply) (int64, error) {
 	return s.Client.LPush(repliesKey, s.EncodeBuffer.Bytes()).Result()
 }
 
+// Fetch retrieves count Reply's from the store
 func (s *Store) Fetch(count int64) ([]Reply, error) {
 	encodedReplies, err := s.Client.LRange(repliesKey, 0, count-1).Result()
 	if err != nil {
@@ -95,11 +100,13 @@ func (s *Store) Fetch(count int64) ([]Reply, error) {
 	return replies, nil
 }
 
+// Trim trims the list of Reply's stored to count
 func (s *Store) Trim(count int) error {
 	_, err := s.Client.LTrim(repliesKey, 0, int64(count-1)).Result()
 	return err
 }
 
+// AddWithTrim persists a Reply to the store & trims the list to count atomically
 func (s *Store) AddWithTrim(reply Reply, trimCount int64) (int64, error) {
 	s.EncodeBuffer.Reset()
 

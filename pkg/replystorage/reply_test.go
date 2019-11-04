@@ -13,11 +13,11 @@ var _ = Describe("replystorage", func() {
 			Author:         "username",
 			AuthorFullname: "t3_b49jk",
 			Body:           "body",
-			BodyHtml:       "html",
+			BodyHTML:       "html",
 			CreatedUtc:     1571371710,
-			Id:             "f5uyrhf",
+			ID:             "f5uyrhf",
 			Name:           "t1_f5uyrhf",
-			ParentId:       "t1_f5uyrdf",
+			ParentID:       "t1_f5uyrdf",
 			Permalink:      "r/subreddit/comments/de31f1/title/f5uyrhf",
 			Requester:      "requester-username-user",
 		}
@@ -96,11 +96,11 @@ var _ = Describe("replystorage", func() {
 		})
 	})
 
-	Describe("RenderSanitizedHtmlForTemplate", func() {
+	Describe("RenderSanitizedHTMLForTemplate", func() {
 		It("returns sanitized html", func() {
-			reply.BodyHtml = "<script>alert(\"dsfsdf\")</script><p>hello</p>"
+			reply.BodyHTML = "<script>alert(\"dsfsdf\")</script><p>hello</p>"
 
-			rendered := reply.RenderSanitizedHtmlForTemplate()
+			rendered := reply.RenderSanitizedHTMLForTemplate()
 			Expect(string(rendered)).To(Equal("<p>hello</p>"))
 		})
 	})

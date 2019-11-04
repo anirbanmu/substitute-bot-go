@@ -15,20 +15,22 @@ import (
 )
 
 const (
-	baseRedditUrl   = "https://www.reddit.com"
-	apiBaseUrl      = "https://www.reddit.com/api"
-	oauthApiBaseUrl = "https://oauth.reddit.com/api"
+	baseRedditURL   = "https://www.reddit.com"
+	apiBaseURL      = "https://www.reddit.com/api"
+	oauthAPIBaseURL = "https://oauth.reddit.com/api"
 )
 
+// Credentials encapsulates the information needed for reddit API auth
 type Credentials struct {
 	Username     string
 	Password     string
-	ClientId     string
+	ClientID     string
 	ClientSecret string
 	UserAgent    string
 }
 
-type Api struct {
+// API provides the abstraction to the reddit API
+type API struct {
 	creds     Credentials
 	Client    *http.Client
 	token     string
@@ -41,8 +43,8 @@ type basicAuth struct {
 	pass string
 }
 
-func buildUrl(baseUrl string, path string, query *url.Values) (*url.URL, error) {
-	base, err := url.Parse(baseUrl)
+func buildURL(baseURL string, path string, query *url.Values) (*url.URL, error) {
+	base, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -61,13 +63,13 @@ func buildUrl(baseUrl string, path string, query *url.Values) (*url.URL, error) 
 	return resolved, nil
 }
 
-func postUrlEncodedForm(client *http.Client, fullUrl string, args *url.Values, headers *map[string]string, auth *basicAuth) ([]byte, error) {
+func postURLEncodedForm(client *http.Client, fullURL string, args *url.Values, headers *map[string]string, auth *basicAuth) ([]byte, error) {
 	body := ""
 	if args != nil {
 		body = args.Encode()
 	}
 
-	req, err := http.NewRequest("POST", fullUrl, strings.NewReader(body))
+	req, err := http.NewRequest("POST", fullURL, strings.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +93,7 @@ func postUrlEncodedForm(client *http.Client, fullUrl string, args *url.Values, h
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("%s returned %d", fullUrl, res.StatusCode)
+		return nil, fmt.Errorf("%s returned %d", fullURL, res.StatusCode)
 	}
 
 	resBody, err := ioutil.ReadAll(res.Body)
@@ -102,32 +104,32 @@ func postUrlEncodedForm(client *http.Client, fullUrl string, args *url.Values, h
 	return resBody, nil
 }
 
-func (api *Api) postUrlEncodedForm(path string, query *url.Values) ([]byte, error) {
+func (api *API) postURLEncodedForm(path string, query *url.Values) ([]byte, error) {
 	if err := api.reAuth(); err != nil {
 		return nil, err
 	}
 
-	apiUrl, err := buildUrl(oauthApiBaseUrl, path, nil)
+	apiURL, err := buildURL(oauthAPIBaseURL, path, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	headers := map[string]string{"User-Agent": api.creds.UserAgent, "Authorization": "bearer " + api.token}
 
-	return postUrlEncodedForm(api.Client, apiUrl.String(), query, &headers, nil)
+	return postURLEncodedForm(api.Client, apiURL.String(), query, &headers, nil)
 }
 
-func (api *Api) getJson(path string, query *url.Values) ([]byte, error) {
+func (api *API) getJSON(path string, query *url.Values) ([]byte, error) {
 	if err := api.reAuth(); err != nil {
 		return nil, err
 	}
 
-	apiUrl, err := buildUrl(oauthApiBaseUrl, path, query)
+	apiURL, err := buildURL(oauthAPIBaseURL, path, query)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", apiUrl.String(), nil)
+	req, err := http.NewRequest("GET", apiURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -154,16 +156,18 @@ func (api *Api) getJson(path string, query *url.Values) ([]byte, error) {
 	return body, nil
 }
 
+// IsFullnameComment allows external checking of if a fullname represents a comment (beginning with t1_)
 func IsFullnameComment(fullname string) bool {
 	return strings.HasPrefix(fullname, "t1_")
 }
 
-func (api *Api) GetComment(fullname string) (*Comment, error) {
+// GetComment retrieves a comment by its fullname (t1_*) from the reddit API
+func (api *API) GetComment(fullname string) (*Comment, error) {
 	if !IsFullnameComment(fullname) {
 		return nil, errors.New("full name given was not a comment")
 	}
 
-	res, err := api.getJson("/info", &url.Values{"id": {fullname}, "raw_json": {"1"}})
+	res, err := api.getJSON("/info", &url.Values{"id": {fullname}, "raw_json": {"1"}})
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +197,8 @@ func (api *Api) GetComment(fullname string) (*Comment, error) {
 	return nil, errors.New("Could not retrieve comment")
 }
 
-func (api *Api) PostComment(fullname string, bodyMarkdown string) (*Comment, error) {
+// PostComment posts a reply to the comment, referenced by fullname, with content of bodyMarkdown
+func (api *API) PostComment(fullname string, bodyMarkdown string) (*Comment, error) {
 	if len(fullname) == 0 {
 		return nil, errors.New("fullname is blank")
 	}
@@ -209,14 +214,14 @@ func (api *Api) PostComment(fullname string, bodyMarkdown string) (*Comment, err
 		"text":     {bodyMarkdown},
 	}
 
-	res, err := api.postUrlEncodedForm("/comment", &body)
+	res, err := api.postURLEncodedForm("/comment", &body)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
 	}
 
 	parsed := struct {
-		Json struct {
+		JSON struct {
 			Errors [][]string `json:"errors"`
 			Data   struct {
 				Things []struct {
@@ -236,41 +241,42 @@ func (api *Api) PostComment(fullname string, bodyMarkdown string) (*Comment, err
 		return nil, err
 	}
 
-	if len(parsed.Json.Errors) > 0 {
-		errorStrings := make([]string, 0, len(parsed.Json.Errors))
-		for i := 0; i < len(parsed.Json.Errors); i++ {
-			errorStrings = append(errorStrings, "["+strings.Join(parsed.Json.Errors[i], ", ")+"]")
+	if len(parsed.JSON.Errors) > 0 {
+		errorStrings := make([]string, 0, len(parsed.JSON.Errors))
+		for i := 0; i < len(parsed.JSON.Errors); i++ {
+			errorStrings = append(errorStrings, "["+strings.Join(parsed.JSON.Errors[i], ", ")+"]")
 		}
 		return nil, errors.New("API errors: " + strings.Join(errorStrings, ", "))
 	}
 
-	if parsed.Json.Data.Things != nil && len(parsed.Json.Data.Things) == 1 && parsed.Json.Data.Things[0].Kind == "t1" {
-		return &parsed.Json.Data.Things[0].Cmt, nil
+	if parsed.JSON.Data.Things != nil && len(parsed.JSON.Data.Things) == 1 && parsed.JSON.Data.Things[0].Kind == "t1" {
+		return &parsed.JSON.Data.Things[0].Cmt, nil
 	}
 
 	return nil, errors.New("Could not post comment")
 }
 
-func (api *Api) reAuth() error {
+func (api *API) reAuth() error {
 	if time.Since(api.grantTime) < time.Minute*40 {
 		return nil
 	}
 
-	log.Printf("reddit.Api - initiating re auth")
+	log.Printf("reddit.API - initiating re auth")
 	token, err := auth(api.creds, api.Client)
 	if err != nil {
-		log.Printf("reddit.Api - failed to re auth: %s", err)
+		log.Printf("reddit.API - failed to re auth: %s", err)
 		return err
 	}
 
-	log.Printf("reddit.Api - successfully re authed")
+	log.Printf("reddit.API - successfully re authed")
 
 	api.token = token
 	api.grantTime = time.Now()
 	return nil
 }
 
-func InitApiFromEnv(client *http.Client) (*Api, error) {
+// InitAPIFromEnv initializes (& auths) a reddit API client by reading credentials from the environment variables
+func InitAPIFromEnv(client *http.Client) (*API, error) {
 	creds := Credentials{
 		os.Getenv("SUBSTITUTE_BOT_USERNAME"),
 		os.Getenv("SUBSTITUTE_BOT_PASSWORD"),
@@ -287,7 +293,7 @@ func InitApiFromEnv(client *http.Client) (*Api, error) {
 		return nil, errors.New("environment variable SUBSTITUTE_BOT_PASSWORD is required")
 	}
 
-	if len(creds.ClientId) == 0 {
+	if len(creds.ClientID) == 0 {
 		return nil, errors.New("environment variable SUBSTITUTE_BOT_CLIENT_ID is required")
 	}
 
@@ -299,10 +305,11 @@ func InitApiFromEnv(client *http.Client) (*Api, error) {
 		return nil, errors.New("environment variable SUBSTITUTE_BOT_USER_AGENT is required")
 	}
 
-	return InitApi(creds, client)
+	return InitAPI(creds, client)
 }
 
-func InitApi(creds Credentials, client *http.Client) (*Api, error) {
+// InitAPI initializes (& auths) a reddit API client using the credentials provided
+func InitAPI(creds Credentials, client *http.Client) (*API, error) {
 	if client == nil {
 		client = &http.Client{Timeout: time.Second * 10}
 	}
@@ -312,7 +319,7 @@ func InitApi(creds Credentials, client *http.Client) (*Api, error) {
 		return nil, err
 	}
 
-	return &Api{
+	return &API{
 		creds:     creds,
 		Client:    client,
 		token:     token,
@@ -328,17 +335,17 @@ func buildAuthRequest(creds Credentials) (*http.Request, error) {
 		"password":   {creds.Password},
 	}
 
-	apiUrl, err := buildUrl(apiBaseUrl, "/v1/access_token", nil)
+	apiURL, err := buildURL(apiBaseURL, "/v1/access_token", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", apiUrl.String(), strings.NewReader(reqBody.Encode()))
+	req, err := http.NewRequest("POST", apiURL.String(), strings.NewReader(reqBody.Encode()))
 	if err != nil {
 		return nil, err
 	}
 
-	req.SetBasicAuth(creds.ClientId, creds.ClientSecret)
+	req.SetBasicAuth(creds.ClientID, creds.ClientSecret)
 	req.Header.Add("User-Agent", creds.UserAgent)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
@@ -346,7 +353,7 @@ func buildAuthRequest(creds Credentials) (*http.Request, error) {
 }
 
 func auth(creds Credentials, client *http.Client) (string, error) {
-	apiUrl, err := buildUrl(apiBaseUrl, "/v1/access_token", nil)
+	apiURL, err := buildURL(apiBaseURL, "/v1/access_token", nil)
 	if err != nil {
 		return "", err
 	}
@@ -359,9 +366,9 @@ func auth(creds Credentials, client *http.Client) (string, error) {
 
 	headers := map[string]string{"User-Agent": creds.UserAgent}
 
-	auth := basicAuth{creds.ClientId, creds.ClientSecret}
+	auth := basicAuth{creds.ClientID, creds.ClientSecret}
 
-	res, err := postUrlEncodedForm(client, apiUrl.String(), &args, &headers, &auth)
+	res, err := postURLEncodedForm(client, apiURL.String(), &args, &headers, &auth)
 	if err != nil {
 		return "", err
 	}
