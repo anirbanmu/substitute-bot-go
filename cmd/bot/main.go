@@ -56,7 +56,7 @@ func processComment(botUser string, comment reddit.Comment, api *reddit.Api, sto
 		return
 	}
 
-	body, err := cmd.Run(parent.Body + "\n\n^^This ^^was ^^posted ^^by ^^a ^^bot. ^^[Source](https://github.com/anirbanmu/substitute-bot-go)")
+	body, err := cmd.Run(parent.Body)
 	if err != nil {
 		log.Printf("processing comment %s - error trying to run SubstitutionCommand{%s, %s}.Run(%s): %s", comment.Name, cmd.ToReplace, cmd.ReplaceWith, parent.Body, err)
 		return
@@ -67,7 +67,7 @@ func processComment(botUser string, comment reddit.Comment, api *reddit.Api, sto
 		return
 	}
 
-	posted, err := api.PostComment(comment.Name, body)
+	posted, err := api.PostComment(comment.Name, body+"\n\n^^This ^^was ^^posted ^^by ^^a ^^bot. ^^[Source](https://github.com/anirbanmu/substitute-bot-go)")
 	if err != nil {
 		log.Printf("processing comment %s - failed to post comment reply: %s", comment.Name, err)
 		return
