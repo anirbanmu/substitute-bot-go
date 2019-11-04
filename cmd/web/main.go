@@ -28,7 +28,7 @@ func compileStyle() (*string, error) {
 	return &str, nil
 }
 
-func GetStyleHandler() (func(http.ResponseWriter, *http.Request), error) {
+func getStyleHandler() (func(http.ResponseWriter, *http.Request), error) {
 	css, err := compileStyle()
 	if err != nil {
 		return nil, err
@@ -40,11 +40,11 @@ func GetStyleHandler() (func(http.ResponseWriter, *http.Request), error) {
 	}, nil
 }
 
-type ReplyFetcher interface {
+type replyFetcher interface {
 	Fetch(count int64) ([]replystorage.Reply, error)
 }
 
-func GetIndexHandler(botUsername string, fetcher ReplyFetcher) func(http.ResponseWriter, *http.Request) {
+func getIndexHandler(botUsername string, fetcher replyFetcher) func(http.ResponseWriter, *http.Request) {
 	t := template.Must(template.New("index").Parse(indexTemplate))
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +82,7 @@ func main() {
 		port = ":" + port
 	}
 
-	styleHandler, err := GetStyleHandler()
+	styleHandler, err := getStyleHandler()
 	if err != nil {
 		log.Panicf("unable to get style handler: %s", err)
 	}
@@ -93,6 +93,6 @@ func main() {
 	}
 
 	http.HandleFunc("/stylesheets/style.css", styleHandler)
-	http.HandleFunc("/", GetIndexHandler(botUsername, store))
+	http.HandleFunc("/", getIndexHandler(botUsername, store))
 	http.ListenAndServe(port, nil)
 }

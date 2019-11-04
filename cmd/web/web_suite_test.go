@@ -29,11 +29,11 @@ func (r *SuccessfulReplyFetcher) Fetch(count int64) ([]replystorage.Reply, error
 			Author:         "username",
 			AuthorFullname: "t3_b49jk",
 			Body:           "body",
-			BodyHtml:       "html",
+			BodyHTML:       "html",
 			CreatedUtc:     1571371710, // October 18, 2019
-			Id:             "f5uyrhf",
+			ID:             "f5uyrhf",
 			Name:           "t1_f5uyrhf",
-			ParentId:       "t1_f5uyrdf",
+			ParentID:       "t1_f5uyrdf",
 			Permalink:      "r/subreddit/comments/de31f1/title/f5uyrhf",
 			Requester:      "requester-username-user",
 		},
@@ -51,9 +51,9 @@ var _ = Describe("web", func() {
 		})
 	})
 
-	Describe("GetStyleHandler", func() {
+	Describe("getStyleHandler", func() {
 		It("returns CSS", func() {
-			handler, err := GetStyleHandler()
+			handler, err := getStyleHandler()
 			Expect(err).NotTo(HaveOccurred())
 
 			req := httptest.NewRequest("GET", "http://example.com/some/path", nil)
@@ -69,11 +69,11 @@ var _ = Describe("web", func() {
 		})
 	})
 
-	Describe("GetIndexHandler", func() {
+	Describe("getIndexHandler", func() {
 		Context("when path matches / exactly", func() {
 			Context("and reply fetching fails", func() {
 				It("returns 500", func() {
-					handler := GetIndexHandler("bot-username", &FailingReplyFetcher{})
+					handler := getIndexHandler("bot-username", &FailingReplyFetcher{})
 
 					req := httptest.NewRequest("GET", "http://example.com/", nil)
 					w := httptest.NewRecorder()
@@ -86,7 +86,7 @@ var _ = Describe("web", func() {
 
 			Context("and reply fetching succeeds", func() {
 				It("returns 200 & renders HTML", func() {
-					handler := GetIndexHandler("bot-username", &SuccessfulReplyFetcher{})
+					handler := getIndexHandler("bot-username", &SuccessfulReplyFetcher{})
 
 					req := httptest.NewRequest("GET", "http://example.com/", nil)
 					w := httptest.NewRecorder()
@@ -104,7 +104,7 @@ var _ = Describe("web", func() {
 
 		Context("when path does not match / exactly", func() {
 			It("returns 404", func() {
-				handler := GetIndexHandler("bot-username", &SuccessfulReplyFetcher{})
+				handler := getIndexHandler("bot-username", &SuccessfulReplyFetcher{})
 
 				req := httptest.NewRequest("GET", "http://example.com/some/path", nil)
 				w := httptest.NewRecorder()

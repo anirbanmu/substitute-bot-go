@@ -20,23 +20,23 @@ var _ = Describe("replystorage", func() {
 	defaultStore, _ := DefaultStore()
 
 	replies := [10]Reply{}
-	repliesJson := [10](*[]byte){}
+	repliesJSON := [10](*[]byte){}
 	for i := 0; i < 10; i++ {
 		replies[i] = Reply{
 			Author:         "username",
 			AuthorFullname: "t3_b49jk",
 			Body:           "body",
-			BodyHtml:       "html",
+			BodyHTML:       "html",
 			CreatedUtc:     1571371710,
-			Id:             "f5uyrhf",
+			ID:             "f5uyrhf",
 			Name:           "t1_f5uyrhf",
-			ParentId:       "t1_f5uyrdf",
+			ParentID:       "t1_f5uyrdf",
 			Permalink:      "r/subreddit/comments/de31f1/title/f5uyrhf",
 			Requester:      fmt.Sprintf("requester-username-%d", i),
 		}
 
 		b, _ := json.Marshal(&replies[i])
-		repliesJson[i] = &b
+		repliesJSON[i] = &b
 	}
 
 	BeforeEach(func() {
@@ -113,14 +113,14 @@ var _ = Describe("replystorage", func() {
 
 					b, err := redisClient.LRange(repliesKey, 0, 0).Result()
 					Expect(err).NotTo(HaveOccurred())
-					Expect(bytes.Equal([]byte(b[0]), *repliesJson[0])).To(BeTrue())
+					Expect(bytes.Equal([]byte(b[0]), *repliesJSON[0])).To(BeTrue())
 				})
 			})
 
 			Describe("Fetch", func() {
 				BeforeEach(func() {
-					for i := 0; i < len(repliesJson); i++ {
-						_, err := redisClient.LPush(repliesKey, *repliesJson[i]).Result()
+					for i := 0; i < len(repliesJSON); i++ {
+						_, err := redisClient.LPush(repliesKey, *repliesJSON[i]).Result()
 						Expect(err).NotTo(HaveOccurred())
 					}
 				})
@@ -138,19 +138,19 @@ var _ = Describe("replystorage", func() {
 
 			Describe("Trim", func() {
 				BeforeEach(func() {
-					for i := 0; i < len(repliesJson); i++ {
-						_, err := redisClient.LPush(repliesKey, *repliesJson[i]).Result()
+					for i := 0; i < len(repliesJSON); i++ {
+						_, err := redisClient.LPush(repliesKey, *repliesJSON[i]).Result()
 						Expect(err).NotTo(HaveOccurred())
 					}
 				})
 
 				It("does nothing if number of replies is less than count", func() {
-					err := defaultStore.Trim(len(repliesJson) * 2)
+					err := defaultStore.Trim(len(repliesJSON) * 2)
 					Expect(err).NotTo(HaveOccurred())
 
 					count, err := redisClient.LLen(repliesKey).Result()
 					Expect(err).NotTo(HaveOccurred())
-					Expect(count).To(Equal(int64(len(repliesJson))))
+					Expect(count).To(Equal(int64(len(repliesJSON))))
 				})
 
 				It("correctly trims number of replies to given count", func() {
@@ -165,25 +165,25 @@ var _ = Describe("replystorage", func() {
 
 			Describe("AddWithTrim", func() {
 				BeforeEach(func() {
-					for i := 0; i < len(repliesJson); i++ {
-						_, err := redisClient.LPush(repliesKey, *repliesJson[i]).Result()
+					for i := 0; i < len(repliesJSON); i++ {
+						_, err := redisClient.LPush(repliesKey, *repliesJSON[i]).Result()
 						Expect(err).NotTo(HaveOccurred())
 					}
 				})
 
 				Context("when number of replies is less than trimCount", func() {
 					It("correctly adds reply to store & doesn't trim the list", func() {
-						replyCount, err := defaultStore.AddWithTrim(replies[0], int64(len(repliesJson)*2+1))
+						replyCount, err := defaultStore.AddWithTrim(replies[0], int64(len(repliesJSON)*2+1))
 						Expect(err).NotTo(HaveOccurred())
-						Expect(replyCount).To(Equal(int64(len(repliesJson) + 1)))
+						Expect(replyCount).To(Equal(int64(len(repliesJSON) + 1)))
 
 						b, err := redisClient.LRange(repliesKey, 0, 0).Result()
 						Expect(err).NotTo(HaveOccurred())
-						Expect(bytes.Equal([]byte(b[0]), *repliesJson[0])).To(BeTrue())
+						Expect(bytes.Equal([]byte(b[0]), *repliesJSON[0])).To(BeTrue())
 
 						count, err := redisClient.LLen(repliesKey).Result()
 						Expect(err).NotTo(HaveOccurred())
-						Expect(count).To(Equal(int64(len(repliesJson) + 1)))
+						Expect(count).To(Equal(int64(len(repliesJSON) + 1)))
 					})
 				})
 
@@ -195,7 +195,7 @@ var _ = Describe("replystorage", func() {
 
 						b, err := redisClient.LRange(repliesKey, 0, 0).Result()
 						Expect(err).NotTo(HaveOccurred())
-						Expect(bytes.Equal([]byte(b[0]), *repliesJson[0])).To(BeTrue())
+						Expect(bytes.Equal([]byte(b[0]), *repliesJSON[0])).To(BeTrue())
 
 						count, err := redisClient.LLen(repliesKey).Result()
 						Expect(err).NotTo(HaveOccurred())

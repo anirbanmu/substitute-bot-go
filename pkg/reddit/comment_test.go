@@ -13,11 +13,11 @@ var _ = Describe("Comment", func() {
 			Author:         "dummy-author",
 			AuthorFullname: "t2_4jtui7g8",
 			Body:           "this is fake text",
-			BodyHtml:       "<div class=\"md\"><p>this is fake text</p></div>",
+			BodyHTML:       "<div class=\"md\"><p>this is fake text</p></div>",
 			CreatedUtc:     1571002615,
-			Id:             "g7krui4",
+			ID:             "g7krui4",
 			Name:           "t1_g7krui4",
-			ParentId:       "t1_h7kxui2",
+			ParentID:       "t1_h7kxui2",
 			Permalink:      "/r/dummy-subreddit/comments/krtjrk/dummy-topic/g7krui4/",
 		}
 	})

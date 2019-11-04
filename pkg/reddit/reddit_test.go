@@ -16,12 +16,12 @@ import (
 var _ = Describe("Reddit", func() {
 	var server *ghttp.Server
 	var client *http.Client
-	var api *Api
+	var api *API
 
 	creds := Credentials{
 		"dummy-username",
 		"dummy-password",
-		"dummy-clientid",
+		"dummy-ClientID",
 		"dummy-clientsecret",
 		"dummy-user-agent",
 	}
@@ -44,7 +44,7 @@ var _ = Describe("Reddit", func() {
 			},
 		}
 
-		api = &Api{
+		api = &API{
 			creds:     creds,
 			Client:    client,
 			token:     token,
@@ -57,7 +57,7 @@ var _ = Describe("Reddit", func() {
 		server.Close()
 	})
 
-	Describe("InitApiFromEnv", func() {
+	Describe("InitAPIFromEnv", func() {
 		BeforeEach(func() {
 			os.Setenv("SUBSTITUTE_BOT_USERNAME", "something")
 			os.Setenv("SUBSTITUTE_BOT_PASSWORD", "something")
@@ -76,46 +76,46 @@ var _ = Describe("Reddit", func() {
 
 		It("returns nil & error when SUBSTITUTE_BOT_USERNAME is not set", func() {
 			os.Unsetenv("SUBSTITUTE_BOT_USERNAME")
-			createdApi, err := InitApiFromEnv(client)
+			createdAPI, err := InitAPIFromEnv(client)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("SUBSTITUTE_BOT_USERNAME"))
-			Expect(createdApi).To(BeNil())
+			Expect(createdAPI).To(BeNil())
 		})
 
 		It("returns nil & error when SUBSTITUTE_BOT_PASSWORD is not set", func() {
 			os.Unsetenv("SUBSTITUTE_BOT_PASSWORD")
-			createdApi, err := InitApiFromEnv(client)
+			createdAPI, err := InitAPIFromEnv(client)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("SUBSTITUTE_BOT_PASSWORD"))
-			Expect(createdApi).To(BeNil())
+			Expect(createdAPI).To(BeNil())
 		})
 
 		It("returns nil & error when SUBSTITUTE_BOT_CLIENT_ID is not set", func() {
 			os.Unsetenv("SUBSTITUTE_BOT_CLIENT_ID")
-			createdApi, err := InitApiFromEnv(client)
+			createdAPI, err := InitAPIFromEnv(client)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("SUBSTITUTE_BOT_CLIENT_ID"))
-			Expect(createdApi).To(BeNil())
+			Expect(createdAPI).To(BeNil())
 		})
 
 		It("returns nil & error when SUBSTITUTE_BOT_CLIENT_SECRET is not set", func() {
 			os.Unsetenv("SUBSTITUTE_BOT_CLIENT_SECRET")
-			createdApi, err := InitApiFromEnv(client)
+			createdAPI, err := InitAPIFromEnv(client)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("SUBSTITUTE_BOT_CLIENT_SECRET"))
-			Expect(createdApi).To(BeNil())
+			Expect(createdAPI).To(BeNil())
 		})
 
 		It("returns nil & error when SUBSTITUTE_BOT_USER_AGENT is not set", func() {
 			os.Unsetenv("SUBSTITUTE_BOT_USER_AGENT")
-			createdApi, err := InitApiFromEnv(client)
+			createdAPI, err := InitAPIFromEnv(client)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("SUBSTITUTE_BOT_USER_AGENT"))
-			Expect(createdApi).To(BeNil())
+			Expect(createdAPI).To(BeNil())
 		})
 	})
 
-	Describe("InitApi", func() {
+	Describe("InitAPI", func() {
 		verificationHandlers := []http.HandlerFunc{
 			ghttp.VerifyRequest("POST", "/api/v1/access_token"),
 			ghttp.VerifyForm(
@@ -125,64 +125,64 @@ var _ = Describe("Reddit", func() {
 					"password":   {creds.Password},
 				},
 			),
-			ghttp.VerifyBasicAuth(creds.ClientId, creds.ClientSecret),
+			ghttp.VerifyBasicAuth(creds.ClientID, creds.ClientSecret),
 			ghttp.VerifyHeader(http.Header{"User-Agent": []string{creds.UserAgent}}),
 		}
 
 		Context("when all goes correctly", func() {
-			It("posts the correct parameters, returns no error & an authed Api", func() {
+			It("posts the correct parameters, returns no error & an authed API", func() {
 				handlers := append(
 					verificationHandlers,
 					ghttp.RespondWith(http.StatusOK, "{\"access_token\":\""+token+"\"}"),
 				)
 				server.AppendHandlers(ghttp.CombineHandlers(handlers...))
 
-				createdApi, err := InitApi(creds, client)
+				createdAPI, err := InitAPI(creds, client)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(createdApi).NotTo(BeNil())
-				Expect(createdApi.token).To(Equal(token))
+				Expect(createdAPI).NotTo(BeNil())
+				Expect(createdAPI.token).To(Equal(token))
 			})
 		})
 
 		Context("when API returns non 200 status code", func() {
-			It("returns error & no Api", func() {
+			It("returns error & no API", func() {
 				handlers := append(
 					verificationHandlers,
 					ghttp.RespondWith(http.StatusInternalServerError, ""),
 				)
 				server.AppendHandlers(ghttp.CombineHandlers(handlers...))
 
-				createdApi, err := InitApi(creds, client)
+				createdAPI, err := InitAPI(creds, client)
 				Expect(err).To(HaveOccurred())
-				Expect(createdApi).To(BeNil())
+				Expect(createdAPI).To(BeNil())
 			})
 		})
 
 		Context("when API returns 200 but no body", func() {
-			It("returns error & no Api", func() {
+			It("returns error & no API", func() {
 				handlers := append(
 					verificationHandlers,
 					ghttp.RespondWith(http.StatusOK, ""),
 				)
 				server.AppendHandlers(ghttp.CombineHandlers(handlers...))
 
-				createdApi, err := InitApi(creds, client)
+				createdAPI, err := InitAPI(creds, client)
 				Expect(err).To(HaveOccurred())
-				Expect(createdApi).To(BeNil())
+				Expect(createdAPI).To(BeNil())
 			})
 		})
 
 		Context("when API returns 200 but blank access_token", func() {
-			It("returns error & no Api", func() {
+			It("returns error & no API", func() {
 				handlers := append(
 					verificationHandlers,
 					ghttp.RespondWith(http.StatusOK, "{\"access_token\":\"\"}"),
 				)
 				server.AppendHandlers(ghttp.CombineHandlers(handlers...))
 
-				createdApi, err := InitApi(creds, client)
+				createdAPI, err := InitAPI(creds, client)
 				Expect(err).To(HaveOccurred())
-				Expect(createdApi).To(BeNil())
+				Expect(createdAPI).To(BeNil())
 			})
 		})
 
@@ -200,10 +200,10 @@ var _ = Describe("Reddit", func() {
 				}
 			})
 
-			It("returns error & no Api", func() {
-				createdApi, err := InitApi(creds, client)
+			It("returns error & no API", func() {
+				createdAPI, err := InitAPI(creds, client)
 				Expect(err).To(HaveOccurred())
-				Expect(createdApi).To(BeNil())
+				Expect(createdAPI).To(BeNil())
 			})
 		})
 	})
@@ -232,14 +232,14 @@ var _ = Describe("Reddit", func() {
 		Author:         "dummy-author",
 		AuthorFullname: "t2_4jtui7g8",
 		Body:           "this is fake text",
-		BodyHtml:       "<div class=\"md\"><p>this is fake text</p></div>",
+		BodyHTML:       "<div class=\"md\"><p>this is fake text</p></div>",
 		CreatedUtc:     1571002615,
-		Id:             "g7krui4",
+		ID:             "g7krui4",
 		Name:           "t1_g7krui4",
-		ParentId:       "t1_h7kxui2",
+		ParentID:       "t1_h7kxui2",
 		Permalink:      "/r/dummy-subreddit/comments/krtjrk/dummy-topic/g7krui4/",
 	}
-	commentJson, _ := json.Marshal(&comment)
+	commentJSON, _ := json.Marshal(&comment)
 
 	Describe("GetComment", func() {
 		var verificationHandlers []http.HandlerFunc
@@ -255,11 +255,11 @@ var _ = Describe("Reddit", func() {
 		})
 
 		Context("when all goes correctly", func() {
-			commentInfoJson := `{"kind":"Listing","data":{"modhash":null,"dist":1,"children":[{"kind":"t1","data":` + string(commentJson) + `}],"after":null,"before":null}}`
+			commentInfoJSON := `{"kind":"Listing","data":{"modhash":null,"dist":1,"children":[{"kind":"t1","data":` + string(commentJSON) + `}],"after":null,"before":null}}`
 			It("returns no error & Comment", func() {
 				handlers := append(
 					verificationHandlers,
-					ghttp.RespondWith(http.StatusOK, commentInfoJson),
+					ghttp.RespondWith(http.StatusOK, commentInfoJSON),
 				)
 				server.AppendHandlers(ghttp.CombineHandlers(handlers...))
 
@@ -331,7 +331,7 @@ var _ = Describe("Reddit", func() {
 	})
 
 	Describe("PostComment", func() {
-		parentId := "t1_h7kxui2"
+		ParentID := "t1_h7kxui2"
 		bodyMd := "**some** markdown"
 
 		var verificationHandlers []http.HandlerFunc
@@ -347,7 +347,7 @@ var _ = Describe("Reddit", func() {
 					url.Values{
 						"raw_json": {"1"},
 						"api_type": {"json"},
-						"thing_id": {parentId},
+						"thing_id": {ParentID},
 						"text":     {bodyMd},
 					},
 				),
@@ -355,16 +355,16 @@ var _ = Describe("Reddit", func() {
 		})
 
 		Context("when all goes correctly", func() {
-			commentInfoJson := `{"json":{"errors":[],"data":{"things":[{"kind":"t1","data":` + string(commentJson) + `}]}}}`
+			commentInfoJSON := `{"json":{"errors":[],"data":{"things":[{"kind":"t1","data":` + string(commentJSON) + `}]}}}`
 
 			It("returns no error & posted Comment", func() {
 				handlers := append(
 					verificationHandlers,
-					ghttp.RespondWith(http.StatusOK, commentInfoJson),
+					ghttp.RespondWith(http.StatusOK, commentInfoJSON),
 				)
 				server.AppendHandlers(ghttp.CombineHandlers(handlers...))
 
-				c, err := api.PostComment(parentId, bodyMd)
+				c, err := api.PostComment(ParentID, bodyMd)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(c).NotTo(BeNil())
 				Expect(*c).To(Equal(comment))
@@ -379,7 +379,7 @@ var _ = Describe("Reddit", func() {
 				)
 				server.AppendHandlers(ghttp.CombineHandlers(handlers...))
 
-				c, err := api.PostComment(parentId, bodyMd)
+				c, err := api.PostComment(ParentID, bodyMd)
 				Expect(err).To(HaveOccurred())
 				Expect(c).To(BeNil())
 			})
@@ -393,7 +393,7 @@ var _ = Describe("Reddit", func() {
 				)
 				server.AppendHandlers(ghttp.CombineHandlers(handlers...))
 
-				c, err := api.PostComment(parentId, bodyMd)
+				c, err := api.PostComment(ParentID, bodyMd)
 				Expect(err).To(HaveOccurred())
 				Expect(c).To(BeNil())
 			})
@@ -416,7 +416,7 @@ var _ = Describe("Reddit", func() {
 			})
 
 			It("returns error & no Comment", func() {
-				c, err := api.PostComment(parentId, bodyMd)
+				c, err := api.PostComment(ParentID, bodyMd)
 				Expect(err).To(HaveOccurred())
 				Expect(c).To(BeNil())
 			})
@@ -430,7 +430,7 @@ var _ = Describe("Reddit", func() {
 				)
 				server.AppendHandlers(ghttp.CombineHandlers(handlers...))
 
-				c, err := api.PostComment(parentId, bodyMd)
+				c, err := api.PostComment(ParentID, bodyMd)
 				Expect(err).To(HaveOccurred())
 				Expect(c).To(BeNil())
 			})
@@ -446,7 +446,7 @@ var _ = Describe("Reddit", func() {
 
 		Context("when no body is given", func() {
 			It("returns error & no comment", func() {
-				c, err := api.PostComment(parentId, "")
+				c, err := api.PostComment(ParentID, "")
 				Expect(err).To(HaveOccurred())
 				Expect(c).To(BeNil())
 			})
@@ -463,7 +463,7 @@ var _ = Describe("Reddit", func() {
 					"password":   {creds.Password},
 				},
 			),
-			ghttp.VerifyBasicAuth(creds.ClientId, creds.ClientSecret),
+			ghttp.VerifyBasicAuth(creds.ClientID, creds.ClientSecret),
 			ghttp.VerifyHeader(http.Header{"User-Agent": []string{creds.UserAgent}}),
 		}
 

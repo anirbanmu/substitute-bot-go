@@ -40,7 +40,7 @@ const indexTemplate = `<!DOCTYPE html>
                 {{ with $r }}
                     <div class="pure-g reply-row">
                         <div class="pure-u-4-5">
-                            {{ .RenderSanitizedHtmlForTemplate }}
+                            {{ .RenderSanitizedHTMLForTemplate }}
                         </div>
                         <div class="pure-u-1-5 reply-details">
                             <p>{{ .RenderCreatedDateForTemplate }}</p>

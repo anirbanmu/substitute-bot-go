@@ -27,18 +27,18 @@ func constructStoredReplyFromPosted(requester string, posted reddit.Comment) rep
 		Author:         posted.Author,
 		AuthorFullname: posted.Author,
 		Body:           posted.Body,
-		BodyHtml:       posted.BodyHtml,
+		BodyHTML:       posted.BodyHTML,
 		CreatedUtc:     int64(posted.CreatedUtc),
-		Id:             posted.Id,
+		ID:             posted.ID,
 		Name:           posted.Name,
-		ParentId:       posted.ParentId,
+		ParentID:       posted.ParentID,
 		Permalink:      posted.Permalink,
 		Requester:      requester,
 	}
 }
 
-func processComment(botUser string, comment reddit.Comment, api *reddit.Api, store *replystorage.Store) {
-	if comment.IsDeleted() || comment.Author == botUser || !reddit.IsFullnameComment(comment.ParentId) {
+func processComment(botUser string, comment reddit.Comment, api *reddit.API, store *replystorage.Store) {
+	if comment.IsDeleted() || comment.Author == botUser || !reddit.IsFullnameComment(comment.ParentID) {
 		return
 	}
 
@@ -51,19 +51,19 @@ func processComment(botUser string, comment reddit.Comment, api *reddit.Api, sto
 		cmd.ReplaceWith = "**" + cmd.ReplaceWith + "**"
 	}
 
-	parent, err := api.GetComment(comment.ParentId)
+	parent, err := api.GetComment(comment.ParentID)
 	if err != nil || parent.IsDeleted() || parent.Author == botUser {
 		return
 	}
 
 	body, err := cmd.Run(parent.Body)
 	if err != nil {
-		log.Printf("processing comment %s - error trying to run SubstitutionCommand{%s, %s}.Run(%s): %s", comment.Name, cmd.ToReplace, cmd.ReplaceWith, parent.Body, err)
+		log.Printf("processing comment %s - error trying to run substitution.Command{%s, %s}.Run(%s): %s", comment.Name, cmd.ToReplace, cmd.ReplaceWith, parent.Body, err)
 		return
 	}
 
 	if len(body) == 0 {
-		log.Printf("processing comment %s - 0 length body for SubstitutionCommand{%s, %s}.Run(%s)", comment.Name, cmd.ToReplace, cmd.ReplaceWith, parent.Body)
+		log.Printf("processing comment %s - 0 length body for substitution.Command{%s, %s}.Run(%s)", comment.Name, cmd.ToReplace, cmd.ReplaceWith, parent.Body)
 		return
 	}
 
@@ -80,8 +80,8 @@ func processComment(botUser string, comment reddit.Comment, api *reddit.Api, sto
 	}
 }
 
-func createApiAndStore(creds reddit.Credentials) (*reddit.Api, *replystorage.Store) {
-	api, err := reddit.InitApi(creds, nil)
+func createAPIAndStore(creds reddit.Credentials) (*reddit.API, *replystorage.Store) {
+	api, err := reddit.InitAPI(creds, nil)
 	if err != nil {
 		log.Panicf("failed to initialize Reddit API: %s", err)
 	}
@@ -94,7 +94,7 @@ func createApiAndStore(creds reddit.Credentials) (*reddit.Api, *replystorage.Sto
 	return api, store
 }
 
-func processCommentEvents(idx int, counter *atomicCounter, wg *sync.WaitGroup, botUsername string, api *reddit.Api, store *replystorage.Store, events <-chan sse.Event) {
+func processCommentEvents(idx int, counter *atomicCounter, wg *sync.WaitGroup, botUsername string, api *reddit.API, store *replystorage.Store, events <-chan sse.Event) {
 	wg.Add(1)
 	defer wg.Done()
 
@@ -140,12 +140,12 @@ func main() {
 	}
 
 	var clients [16]struct {
-		api   *reddit.Api
+		api   *reddit.API
 		store *replystorage.Store
 	}
 
 	for i := 0; i < len(clients); i++ {
-		api, store := createApiAndStore(creds)
+		api, store := createAPIAndStore(creds)
 		clients[i].api = api
 		clients[i].store = store
 	}
@@ -170,10 +170,10 @@ func main() {
 	}()
 
 	// Start comment streamer
-	const streamUrl = "http://stream.pushshift.io/?type=comments&filter=author,author_fullname,body,body_html,created_utc,id,name,parent_id,permalink"
+	const streamURL = "http://stream.pushshift.io/?type=comments&filter=author,author_fullname,body,body_html,created_utc,id,name,parent_id,permalink"
 
 	// We give up control of events here
-	cancel, errChan, err := sse.Stream(events, &wg, streamUrl, nil)
+	cancel, errChan, err := sse.Stream(events, &wg, streamURL, nil)
 	if err != nil {
 		log.Panicf("stream initialization errored: %s", err)
 	}
