@@ -1,23 +1,26 @@
-package replystorage
+package persistence
 
 import (
 	"bytes"
 	"github.com/go-redis/redis"
 	"github.com/ugorji/go/codec"
 	"os"
+	"strconv"
 )
 
 const (
-	prefix     = "substitute-bot-go"
-	repliesKey = "substitute-bot-go:comments"
+	prefix          = "substitute-bot-go"
+	repliesKey      = "substitute-bot-go:comments"
+	maxCommentIDKey = "substitute-bot-go:max-comment-id"
 )
 
 // Store represents a reply store that can be used to store/retrieve replies
 type Store struct {
-	Client       *redis.Client
-	EncodeBuffer *bytes.Buffer
-	Encoder      *codec.Encoder
-	Decoder      *codec.Decoder
+	Client         *redis.Client
+	EncodeBuffer   *bytes.Buffer
+	Encoder        *codec.Encoder
+	Decoder        *codec.Decoder
+	storeMaxScript *redis.Script
 }
 
 func defaultRedisClient() *redis.Client {
@@ -58,11 +61,28 @@ func NewStore(client *redis.Client, handle codec.Handle) (*Store, error) {
 	encodeBuffer := bytes.Buffer{}
 	encoder := codec.NewEncoder(&encodeBuffer, handle)
 
+	script := redis.NewScript(`
+		local existing = redis.call("GET", KEYS[1])
+		local num = tonumber(ARGV[1])
+		if (existing ~= false)
+		then
+			local existingnum = tonumber(existing)
+			local newmax = math.max(existingnum, num)
+
+			redis.call("SET", KEYS[1], newmax)
+			return newmax
+		end
+
+		redis.call("SET", KEYS[1], num)
+		return num
+	`)
+
 	return &Store{
-		Client:       client,
-		EncodeBuffer: &encodeBuffer,
-		Encoder:      encoder,
-		Decoder:      codec.NewDecoderBytes(nil, handle),
+		Client:         client,
+		EncodeBuffer:   &encodeBuffer,
+		Encoder:        encoder,
+		Decoder:        codec.NewDecoderBytes(nil, handle),
+		storeMaxScript: script,
 	}, nil
 }
 
@@ -71,8 +91,8 @@ func DefaultStore() (*Store, error) {
 	return NewStore(defaultRedisClient(), defaultCodecHandle())
 }
 
-// Add pesists a Reply to the store
-func (s *Store) Add(reply Reply) (int64, error) {
+// AddReply pesists a Reply to the store
+func (s *Store) AddReply(reply Reply) (int64, error) {
 	s.EncodeBuffer.Reset()
 
 	if err := s.Encoder.Encode(reply); err != nil {
@@ -82,8 +102,8 @@ func (s *Store) Add(reply Reply) (int64, error) {
 	return s.Client.LPush(repliesKey, s.EncodeBuffer.Bytes()).Result()
 }
 
-// Fetch retrieves count Reply's from the store
-func (s *Store) Fetch(count int64) ([]Reply, error) {
+// FetchReply retrieves count Reply's from the store
+func (s *Store) FetchReply(count int64) ([]Reply, error) {
 	encodedReplies, err := s.Client.LRange(repliesKey, 0, count-1).Result()
 	if err != nil {
 		return []Reply{}, err
@@ -100,14 +120,14 @@ func (s *Store) Fetch(count int64) ([]Reply, error) {
 	return replies, nil
 }
 
-// Trim trims the list of Reply's stored to count
-func (s *Store) Trim(count int) error {
+// TrimReplies trims the list of Reply's stored to count
+func (s *Store) TrimReplies(count int) error {
 	_, err := s.Client.LTrim(repliesKey, 0, int64(count-1)).Result()
 	return err
 }
 
-// AddWithTrim persists a Reply to the store & trims the list to count atomically
-func (s *Store) AddWithTrim(reply Reply, trimCount int64) (int64, error) {
+// AddReplyWithTrim persists a Reply to the store & trims the list to count atomically
+func (s *Store) AddReplyWithTrim(reply Reply, trimCount int64) (int64, error) {
 	s.EncodeBuffer.Reset()
 
 	if err := s.Encoder.Encode(reply); err != nil {
@@ -125,4 +145,34 @@ func (s *Store) AddWithTrim(reply Reply, trimCount int64) (int64, error) {
 	}
 
 	return length.Val(), nil
+}
+
+// AddNewCommentID stores a new max comment ID seen if it's greater than what's already stored (if any)
+func (s *Store) AddNewCommentID(stringID string) (int64, error) {
+	ID, err := strconv.ParseInt(stringID, 10, 64)
+	if err != nil {
+		return -1, err
+	}
+
+	max, err := s.storeMaxScript.Run(s.Client, []string{maxCommentIDKey}, ID).Result()
+	if err != nil {
+		return -1, err
+	}
+
+	return max.(int64), nil
+}
+
+// MaxCommentID retrieves the last stored max comment id if it exists
+func (s *Store) MaxCommentID() (int64, error) {
+	max, err := s.Client.Get(maxCommentIDKey).Result()
+	if err != nil {
+		return -1, err
+	}
+
+	ID, err := strconv.ParseInt(max, 10, 64)
+	if err != nil {
+		return -1, err
+	}
+
+	return ID, err
 }

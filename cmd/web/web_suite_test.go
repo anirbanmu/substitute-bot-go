@@ -2,7 +2,7 @@ package main
 
 import (
 	"errors"
-	"github.com/anirbanmu/substitute-bot-go/pkg/replystorage"
+	"github.com/anirbanmu/substitute-bot-go/pkg/persistence"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io/ioutil"
@@ -17,14 +17,14 @@ func TestWeb(t *testing.T) {
 
 type FailingReplyFetcher struct{}
 
-func (r *FailingReplyFetcher) Fetch(count int64) ([]replystorage.Reply, error) {
+func (r *FailingReplyFetcher) FetchReply(count int64) ([]persistence.Reply, error) {
 	return nil, errors.New("some error")
 }
 
 type SuccessfulReplyFetcher struct{}
 
-func (r *SuccessfulReplyFetcher) Fetch(count int64) ([]replystorage.Reply, error) {
-	replies := []replystorage.Reply{
+func (r *SuccessfulReplyFetcher) FetchReply(count int64) ([]persistence.Reply, error) {
+	replies := []persistence.Reply{
 		{
 			Author:         "username",
 			AuthorFullname: "t3_b49jk",

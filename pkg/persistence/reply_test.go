@@ -1,11 +1,11 @@
-package replystorage
+package persistence
 
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("replystorage", func() {
+var _ = Describe("persistence", func() {
 	var reply Reply
 
 	BeforeEach(func() {

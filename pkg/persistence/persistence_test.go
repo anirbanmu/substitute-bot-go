@@ -1,4 +1,4 @@
-package replystorage
+package persistence
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
-var _ = Describe("replystorage", func() {
+var _ = Describe("persistence", func() {
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // no password set
@@ -105,9 +105,9 @@ var _ = Describe("replystorage", func() {
 		})
 
 		Context("methods", func() {
-			Describe("Add", func() {
+			Describe("AddReply", func() {
 				It("correctly adds reply to store", func() {
-					replyCount, err := defaultStore.Add(replies[0])
+					replyCount, err := defaultStore.AddReply(replies[0])
 					Expect(err).NotTo(HaveOccurred())
 					Expect(replyCount).To(Equal(int64(1)))
 
@@ -117,7 +117,7 @@ var _ = Describe("replystorage", func() {
 				})
 			})
 
-			Describe("Fetch", func() {
+			Describe("FetchReply", func() {
 				BeforeEach(func() {
 					for i := 0; i < len(repliesJSON); i++ {
 						_, err := redisClient.LPush(repliesKey, *repliesJSON[i]).Result()
@@ -126,7 +126,7 @@ var _ = Describe("replystorage", func() {
 				})
 
 				It("correctly fetches given number of replies from store", func() {
-					returnedReplies, err := defaultStore.Fetch(7)
+					returnedReplies, err := defaultStore.FetchReply(7)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(len(returnedReplies)).To(Equal(7))
 
@@ -136,7 +136,7 @@ var _ = Describe("replystorage", func() {
 				})
 			})
 
-			Describe("Trim", func() {
+			Describe("TrimReplies", func() {
 				BeforeEach(func() {
 					for i := 0; i < len(repliesJSON); i++ {
 						_, err := redisClient.LPush(repliesKey, *repliesJSON[i]).Result()
@@ -145,7 +145,7 @@ var _ = Describe("replystorage", func() {
 				})
 
 				It("does nothing if number of replies is less than count", func() {
-					err := defaultStore.Trim(len(repliesJSON) * 2)
+					err := defaultStore.TrimReplies(len(repliesJSON) * 2)
 					Expect(err).NotTo(HaveOccurred())
 
 					count, err := redisClient.LLen(repliesKey).Result()
@@ -154,7 +154,7 @@ var _ = Describe("replystorage", func() {
 				})
 
 				It("correctly trims number of replies to given count", func() {
-					err := defaultStore.Trim(4)
+					err := defaultStore.TrimReplies(4)
 					Expect(err).NotTo(HaveOccurred())
 
 					count, err := redisClient.LLen(repliesKey).Result()
@@ -163,7 +163,7 @@ var _ = Describe("replystorage", func() {
 				})
 			})
 
-			Describe("AddWithTrim", func() {
+			Describe("AddReplyWithTrim", func() {
 				BeforeEach(func() {
 					for i := 0; i < len(repliesJSON); i++ {
 						_, err := redisClient.LPush(repliesKey, *repliesJSON[i]).Result()
@@ -173,7 +173,7 @@ var _ = Describe("replystorage", func() {
 
 				Context("when number of replies is less than trimCount", func() {
 					It("correctly adds reply to store & doesn't trim the list", func() {
-						replyCount, err := defaultStore.AddWithTrim(replies[0], int64(len(repliesJSON)*2+1))
+						replyCount, err := defaultStore.AddReplyWithTrim(replies[0], int64(len(repliesJSON)*2+1))
 						Expect(err).NotTo(HaveOccurred())
 						Expect(replyCount).To(Equal(int64(len(repliesJSON) + 1)))
 
@@ -189,7 +189,7 @@ var _ = Describe("replystorage", func() {
 
 				Context("when number of replies is greater than trimCount", func() {
 					It("correctly adds reply to store & trims the list", func() {
-						replyCount, err := defaultStore.AddWithTrim(replies[0], 2)
+						replyCount, err := defaultStore.AddReplyWithTrim(replies[0], 2)
 						Expect(err).NotTo(HaveOccurred())
 						Expect(replyCount).To(Equal(int64(2)))
 
@@ -200,6 +200,72 @@ var _ = Describe("replystorage", func() {
 						count, err := redisClient.LLen(repliesKey).Result()
 						Expect(err).NotTo(HaveOccurred())
 						Expect(count).To(Equal(int64(2)))
+					})
+				})
+			})
+
+			Describe("AddNewCommentID", func() {
+				Context("when there is no existing max id", func() {
+					It("sets given id to max and returns it", func() {
+						max, err := defaultStore.AddNewCommentID("34849")
+						Expect(err).NotTo(HaveOccurred())
+						Expect(max).To(Equal(int64(34849)))
+
+						m, err := redisClient.Get(maxCommentIDKey).Result()
+						Expect(err).NotTo(HaveOccurred())
+						Expect(m).To(Equal("34849"))
+					})
+				})
+
+				Context("when there is an existing max id", func() {
+					Context("and the existing max id is lower", func() {
+						It("sets given id to max and returns it", func() {
+							_, err := redisClient.Set(maxCommentIDKey, 90, 0).Result()
+							Expect(err).NotTo(HaveOccurred())
+
+							max, err := defaultStore.AddNewCommentID("100")
+							Expect(err).NotTo(HaveOccurred())
+							Expect(max).To(Equal(int64(100)))
+
+							m, err := redisClient.Get(maxCommentIDKey).Result()
+							Expect(err).NotTo(HaveOccurred())
+							Expect(m).To(Equal("100"))
+						})
+					})
+
+					Context("and the existing max id is higher", func() {
+						It("returns existing id", func() {
+							_, err := redisClient.Set(maxCommentIDKey, 100, 0).Result()
+							Expect(err).NotTo(HaveOccurred())
+
+							max, err := defaultStore.AddNewCommentID("90")
+							Expect(err).NotTo(HaveOccurred())
+							Expect(max).To(Equal(int64(100)))
+
+							m, err := redisClient.Get(maxCommentIDKey).Result()
+							Expect(err).NotTo(HaveOccurred())
+							Expect(m).To(Equal("100"))
+						})
+					})
+				})
+			})
+
+			Describe("MaxCommentID", func() {
+				Context("when there is no existing max id", func() {
+					It("returns err", func() {
+						_, err := defaultStore.MaxCommentID()
+						Expect(err).To(HaveOccurred())
+					})
+				})
+
+				Context("when there is an existing max id", func() {
+					It("returns id", func() {
+						_, err := redisClient.Set(maxCommentIDKey, 100, 0).Result()
+						Expect(err).NotTo(HaveOccurred())
+
+						m, err := defaultStore.MaxCommentID()
+						Expect(err).NotTo(HaveOccurred())
+						Expect(m).To(Equal(int64(100)))
 					})
 				})
 			})

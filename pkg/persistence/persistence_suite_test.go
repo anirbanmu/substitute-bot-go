@@ -1,4 +1,4 @@
-package replystorage
+package persistence
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestReplystorage(t *testing.T) {
+func TestPersistence(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "replystorage Suite")
+	RunSpecs(t, "persistence Suite")
 }
