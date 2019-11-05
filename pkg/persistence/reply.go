@@ -1,4 +1,4 @@
-package replystorage
+package persistence
 
 import (
 	"github.com/microcosm-cc/bluemonday"
