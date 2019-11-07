@@ -1,21 +1,45 @@
 package substitution
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+type parseSubCommandTestCase struct {
+	input string
+	cmd   *Command
+	err   bool
+}
 
 func TestParseSubstitutionCommand(t *testing.T) {
-	cases := []struct {
-		input string
-		cmd   *Command
-		err   bool
-	}{
+	baseCases := []parseSubCommandTestCase{
 		{"", nil, true},
 		{`s\4\3`, nil, true},
 		{"s/m/r", &Command{"m", "r"}, false},
-		{"s#m#r", &Command{"m", "r"}, false},
-		{"\ns#m#r", nil, true}, // Command not on first line
-		{" s#m#r", nil, true},
-		{"s/sp ace/s pace", &Command{"sp ace", "s pace"}, false},
-		{"s/sp ace/s pace\nshould not be there", &Command{"sp ace", "s pace"}, false},
+		{"s//m//r", &Command{"/m", "/r"}, false},                    // Embedded slashes
+		{"s//m//r/", &Command{"/m", "/r"}, false},                   // Embedded slashes
+		{"s/m/r \nshould not be there", &Command{"m", "r "}, false}, // Trailing space
+		{"s/m/r/", &Command{"m", "r"}, false},                       // Trailing slash
+		{"s/m/r/ \nshould not be there", &Command{"m", "r"}, false}, // Trailing slash & spaces
+		{"\ns/m/r", nil, true},                                      // Command not on first line
+		{" s/m/r", nil, true},                                       // Command starts with space
+		{"s/sp ace /s pace ", &Command{"sp ace ", "s pace "}, false},
+		{"s/sp ace /s pace \nshould not be there", &Command{"sp ace ", "s pace "}, false},
+	}
+
+	cases := baseCases[:]
+	for _, c := range baseCases {
+		var cmd *Command = nil
+		if c.cmd != nil {
+			cmd = &Command{strings.Replace(c.cmd.ToReplace, "/", "#", -1), strings.Replace(c.cmd.ReplaceWith, "/", "#", -1)}
+		}
+		cases = append(cases,
+			parseSubCommandTestCase{
+				input: strings.Replace(c.input, "/", "#", -1),
+				cmd:   cmd,
+				err:   c.err,
+			},
+		)
 	}
 
 	for _, c := range cases {
