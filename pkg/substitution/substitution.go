@@ -13,8 +13,8 @@ type Command struct {
 
 // ParseSubstitutionCommand tries to parse a VIM style substitution command from a string
 func ParseSubstitutionCommand(txt string) (*Command, error) {
-	re0 := regexp.MustCompile(`(?m:\As\/(.+?)\/(.*?)(?:\/\s*){0,1}$)`)
-	re1 := regexp.MustCompile(`(?m:\As#(.+?)#(.*?)(?:#\s*){0,1}$)`)
+	re0 := regexp.MustCompile(`(?m:\As\/(.+?)\/(.*?)(?:\/g{0,1}\s*){0,1}$)`)
+	re1 := regexp.MustCompile(`(?m:\As#(.+?)#(.*?)(?:#g{0,1}\s*){0,1}$)`)
 	parts := re0.FindStringSubmatch(txt)
 	if len(parts) != 3 {
 		parts = re1.FindStringSubmatch(txt)

@@ -2,7 +2,7 @@
 
 [![CircleCI](https://circleci.com/gh/anirbanmu/substitute-bot-go.svg?style=shield)](https://circleci.com/gh/anirbanmu/substitute-bot-go)
 
-A [Reddit](https://www.reddit.com/) bot that provides the ability to search and replace parent comments. Supports Ruby regular expression syntax. This is a port of the original Ruby [substitute-bot](https://github.com/anirbanmu/substitute-bot) into Go.
+A [Reddit](https://www.reddit.com/) bot that provides the ability to search and replace parent comments. Supports Go regular expression syntax. Aim is not to support everything, just very simple replacement. This is a port of the original Ruby [substitute-bot](https://github.com/anirbanmu/substitute-bot) into Go.
 
 ## Compatibility
 This project uses Go modules so please use a version of Go (>= 1.11) that supports them. This has been developed and tested with Go 1.13.1.
