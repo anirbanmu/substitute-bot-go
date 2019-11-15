@@ -16,13 +16,15 @@ func TestParseSubstitutionCommand(t *testing.T) {
 		{"", nil, true},
 		{`s\4\3`, nil, true},
 		{"s/m/r", &Command{"m", "r"}, false},
-		{"s//m//r", &Command{"/m", "/r"}, false},                    // Embedded slashes
-		{"s//m//r/", &Command{"/m", "/r"}, false},                   // Embedded slashes
-		{"s/m/r \nshould not be there", &Command{"m", "r "}, false}, // Trailing space
-		{"s/m/r/", &Command{"m", "r"}, false},                       // Trailing slash
-		{"s/m/r/ \nshould not be there", &Command{"m", "r"}, false}, // Trailing slash & spaces
-		{"\ns/m/r", nil, true},                                      // Command not on first line
-		{" s/m/r", nil, true},                                       // Command starts with space
+		{"s//m//r", &Command{"/m", "/r"}, false},                     // Embedded slashes
+		{"s//m//r/", &Command{"/m", "/r"}, false},                    // Embedded slashes
+		{"s/m/r \nshould not be there", &Command{"m", "r "}, false},  // Trailing space
+		{"s/m/r/", &Command{"m", "r"}, false},                        // Trailing slash
+		{"s/m/r/ \nshould not be there", &Command{"m", "r"}, false},  // Trailing slash & spaces
+		{"s/m/r/g", &Command{"m", "r"}, false},                       // Trailing g
+		{"s/m/r/g \nshould not be there", &Command{"m", "r"}, false}, // Trailing g, slash & spaces
+		{"\ns/m/r", nil, true},                                       // Command not on first line
+		{" s/m/r", nil, true},                                        // Command starts with space
 		{"s/sp ace /s pace ", &Command{"sp ace ", "s pace "}, false},
 		{"s/sp ace /s pace \nshould not be there", &Command{"sp ace ", "s pace "}, false},
 	}
