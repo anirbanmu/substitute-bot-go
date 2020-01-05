@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/ugorji/go/codec"
+	"time"
 )
 
 var _ = Describe("persistence", func() {
@@ -59,7 +60,7 @@ var _ = Describe("persistence", func() {
 
 			Describe("NewStore", func() {
 				Context("when no parameters are given", func() {
-					store, err := NewStore(nil, nil)
+					store, err := NewStore(nil, nil, nil)
 					It("returns a Store with a non-nil client & encoder/decoder", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(store.Client).NotTo(BeNil())
@@ -76,14 +77,14 @@ var _ = Describe("persistence", func() {
 							DB:       0,  // use default DB
 						})
 
-						store, err := NewStore(client, nil)
+						store, err := NewStore(client, nil, nil)
 						Expect(err).To(HaveOccurred())
 						Expect(store).To(BeNil())
 					})
 				})
 
 				Context("when only client is given", func() {
-					store, err := NewStore(redisClient, nil)
+					store, err := NewStore(redisClient, nil, nil)
 					It("returns a Store with a same client as given & encoder/decoder", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(store.Client).To(Equal(redisClient))
@@ -93,7 +94,7 @@ var _ = Describe("persistence", func() {
 				})
 
 				Context("when only encoding is given", func() {
-					store, err := NewStore(nil, &codec.CborHandle{})
+					store, err := NewStore(nil, &codec.CborHandle{}, nil)
 					It("returns a Store with a non-nil client & encoder/decoder", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(store.Client).NotTo(BeNil())
@@ -205,6 +206,9 @@ var _ = Describe("persistence", func() {
 			})
 
 			Describe("AddNewCommentID", func() {
+				zeroDuration, _ := time.ParseDuration("0s")
+				setExpirationDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", defaultMaxCommentIDExpirationSeconds))
+
 				Context("when there is no existing max id", func() {
 					It("sets given id to max and returns it", func() {
 						max, err := defaultStore.AddNewCommentID("34849")
@@ -214,6 +218,11 @@ var _ = Describe("persistence", func() {
 						m, err := redisClient.Get(maxCommentIDKey).Result()
 						Expect(err).NotTo(HaveOccurred())
 						Expect(m).To(Equal("34849"))
+
+						// Make sure expiration is being set
+						exp, err := redisClient.TTL(maxCommentIDKey).Result()
+						Expect(err).NotTo(HaveOccurred())
+						Expect(exp).To(SatisfyAll(BeNumerically(">", zeroDuration), BeNumerically("<=", setExpirationDuration)))
 					})
 				})
 
@@ -230,6 +239,11 @@ var _ = Describe("persistence", func() {
 							m, err := redisClient.Get(maxCommentIDKey).Result()
 							Expect(err).NotTo(HaveOccurred())
 							Expect(m).To(Equal("100"))
+
+							// Make sure expiration is being set
+							exp, err := redisClient.TTL(maxCommentIDKey).Result()
+							Expect(err).NotTo(HaveOccurred())
+							Expect(exp).To(SatisfyAll(BeNumerically(">", zeroDuration), BeNumerically("<=", setExpirationDuration)))
 						})
 					})
 

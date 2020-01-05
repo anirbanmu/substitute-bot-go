@@ -87,7 +87,7 @@ func createAPIAndStore(creds reddit.Credentials) (*reddit.API, *persistence.Stor
 		log.Panicf("failed to initialize Reddit API: %s", err)
 	}
 
-	store, err := persistence.NewStore(nil, &codec.CborHandle{})
+	store, err := persistence.NewStore(nil, &codec.CborHandle{}, nil)
 	if err != nil {
 		log.Panicf("failed to get persistence.DefaultStore (is redis running? does REDIS_URL need to be set?): %s", err)
 	}
