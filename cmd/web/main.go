@@ -87,7 +87,7 @@ func main() {
 		log.Panicf("unable to get style handler: %s", err)
 	}
 
-	store, err := persistence.NewStore(nil, &codec.CborHandle{})
+	store, err := persistence.NewStore(nil, &codec.CborHandle{}, nil)
 	if err != nil {
 		log.Panicf("unable to get persistence.DefaultStore: %s", err)
 	}

@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/go-redis/redis"
 	"github.com/ugorji/go/codec"
 	"os"
@@ -9,9 +10,10 @@ import (
 )
 
 const (
-	prefix          = "substitute-bot-go"
-	repliesKey      = "substitute-bot-go:comments"
-	maxCommentIDKey = "substitute-bot-go:max-comment-id"
+	prefix                               = "substitute-bot-go"
+	repliesKey                           = "substitute-bot-go:comments"
+	maxCommentIDKey                      = "substitute-bot-go:max-comment-id"
+	defaultMaxCommentIDExpirationSeconds = 15 * 60
 )
 
 // Store represents a reply store that can be used to store/retrieve replies
@@ -43,7 +45,7 @@ func defaultCodecHandle() codec.Handle {
 }
 
 // NewStore creates a new Store with provided redis client & codec
-func NewStore(client *redis.Client, handle codec.Handle) (*Store, error) {
+func NewStore(client *redis.Client, handle codec.Handle, maxCommentIDExpirationSeconds *int) (*Store, error) {
 	if client == nil {
 		client = defaultRedisClient()
 	}
@@ -61,7 +63,12 @@ func NewStore(client *redis.Client, handle codec.Handle) (*Store, error) {
 	encodeBuffer := bytes.Buffer{}
 	encoder := codec.NewEncoder(&encodeBuffer, handle)
 
-	script := redis.NewScript(`
+	if maxCommentIDExpirationSeconds == nil {
+		defaultSeconds := defaultMaxCommentIDExpirationSeconds
+		maxCommentIDExpirationSeconds = &defaultSeconds
+	}
+
+	scriptText := fmt.Sprintf(`
 		local existing = redis.call("GET", KEYS[1])
 		local num = tonumber(ARGV[1])
 		if (existing ~= false)
@@ -69,13 +76,15 @@ func NewStore(client *redis.Client, handle codec.Handle) (*Store, error) {
 			local existingnum = tonumber(existing)
 			local newmax = math.max(existingnum, num)
 
-			redis.call("SET", KEYS[1], newmax)
+			redis.call("SETEX", KEYS[1], %d, newmax)
 			return newmax
 		end
 
-		redis.call("SET", KEYS[1], num)
+		redis.call("SETEX", KEYS[1], %d, num)
 		return num
-	`)
+	`, *maxCommentIDExpirationSeconds, *maxCommentIDExpirationSeconds)
+
+	script := redis.NewScript(scriptText)
 
 	return &Store{
 		Client:         client,
@@ -88,7 +97,7 @@ func NewStore(client *redis.Client, handle codec.Handle) (*Store, error) {
 
 // DefaultStore creates a store with defaults (default redis & json)
 func DefaultStore() (*Store, error) {
-	return NewStore(defaultRedisClient(), defaultCodecHandle())
+	return NewStore(defaultRedisClient(), defaultCodecHandle(), nil)
 }
 
 // AddReply pesists a Reply to the store
