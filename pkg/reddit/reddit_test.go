@@ -2,15 +2,16 @@ package reddit
 
 import (
 	"encoding/json"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/ghttp"
-	"github.com/ugorji/go/codec"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/ghttp"
+	"github.com/ugorji/go/codec"
 )
 
 var _ = Describe("Reddit", func() {

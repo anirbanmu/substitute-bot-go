@@ -4,14 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ugorji/go/codec"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/ugorji/go/codec"
 )
 
 const (
@@ -35,6 +37,7 @@ type API struct {
 	Client    *http.Client
 	token     string
 	grantTime time.Time
+	mutex     sync.RWMutex
 	Decoder   *codec.Decoder
 }
 
@@ -114,7 +117,7 @@ func (api *API) postURLEncodedForm(path string, query *url.Values) ([]byte, erro
 		return nil, err
 	}
 
-	headers := map[string]string{"User-Agent": api.creds.UserAgent, "Authorization": "bearer " + api.token}
+	headers := map[string]string{"User-Agent": api.creds.UserAgent, "Authorization": "bearer " + api.authToken()}
 
 	return postURLEncodedForm(api.Client, apiURL.String(), query, &headers, nil)
 }
@@ -135,7 +138,7 @@ func (api *API) getJSON(path string, query *url.Values) ([]byte, error) {
 	}
 
 	req.Header.Add("User-Agent", api.creds.UserAgent)
-	req.Header.Add("Authorization", "bearer "+api.token)
+	req.Header.Add("Authorization", "bearer "+api.authToken())
 
 	res, err := api.Client.Do(req)
 	if err != nil {
@@ -256,8 +259,30 @@ func (api *API) PostComment(fullname string, bodyMarkdown string) (*Comment, err
 	return nil, errors.New("Could not post comment")
 }
 
+func (api *API) authToken() string {
+	api.mutex.RLock()
+	defer api.mutex.RUnlock()
+
+	return api.token
+}
+
+func (api *API) authValid() bool {
+	return time.Since(api.grantTime) < 40*time.Minute
+}
+
 func (api *API) reAuth() error {
-	if time.Since(api.grantTime) < time.Minute*40 {
+	api.mutex.RLock()
+	valid := api.authValid()
+	api.mutex.RUnlock()
+	if valid {
+		return nil
+	}
+
+	api.mutex.Lock()
+	defer api.mutex.Unlock()
+
+	// Check again to see if someone else acquired the write lock & reAuthed before us
+	if api.authValid() {
 		return nil
 	}
 

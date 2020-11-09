@@ -3,26 +3,29 @@ package persistence
 import (
 	"bytes"
 	"fmt"
-	"github.com/go-redis/redis"
-	"github.com/ugorji/go/codec"
 	"os"
 	"strconv"
+	"time"
+
+	"github.com/go-redis/redis"
+	"github.com/ugorji/go/codec"
 )
 
 const (
-	prefix                               = "substitute-bot-go"
-	repliesKey                           = "substitute-bot-go:comments"
-	maxCommentIDKey                      = "substitute-bot-go:max-comment-id"
-	defaultMaxCommentIDExpirationSeconds = 15 * 60
+	prefix                                    = "substitute-bot-go"
+	repliesKey                                = "substitute-bot-go:comments"
+	maxCommentIDKey                           = "substitute-bot-go:max-comment-id"
+	processedCommentIDPrefix                  = "substitute-bot-go:processed-comments"
+	defaultMaxCommentIDExpirationSeconds      = 15 * 60
+	defaultProcessedCommentIDExpirationSecond = 5 * 60
 )
 
 // Store represents a reply store that can be used to store/retrieve replies
 type Store struct {
-	Client         *redis.Client
-	EncodeBuffer   *bytes.Buffer
-	Encoder        *codec.Encoder
-	Decoder        *codec.Decoder
-	storeMaxScript *redis.Script
+	Client                  *redis.Client
+	handle                  codec.Handle
+	storeMaxScript          *redis.Script
+	seenCommentIDExpiration time.Duration
 }
 
 func defaultRedisClient() *redis.Client {
@@ -45,7 +48,7 @@ func defaultCodecHandle() codec.Handle {
 }
 
 // NewStore creates a new Store with provided redis client & codec
-func NewStore(client *redis.Client, handle codec.Handle, maxCommentIDExpirationSeconds *int) (*Store, error) {
+func NewStore(client *redis.Client, handle codec.Handle, maxCommentIDExpirationSeconds *int, seenCommentIDExpirationSeconds *int) (*Store, error) {
 	if client == nil {
 		client = defaultRedisClient()
 	}
@@ -60,12 +63,14 @@ func NewStore(client *redis.Client, handle codec.Handle, maxCommentIDExpirationS
 		handle = defaultCodecHandle()
 	}
 
-	encodeBuffer := bytes.Buffer{}
-	encoder := codec.NewEncoder(&encodeBuffer, handle)
-
 	if maxCommentIDExpirationSeconds == nil {
 		defaultSeconds := defaultMaxCommentIDExpirationSeconds
 		maxCommentIDExpirationSeconds = &defaultSeconds
+	}
+
+	if seenCommentIDExpirationSeconds == nil {
+		defaultSeenSeconds := defaultProcessedCommentIDExpirationSecond
+		seenCommentIDExpirationSeconds = &defaultSeenSeconds
 	}
 
 	scriptText := fmt.Sprintf(`
@@ -87,28 +92,27 @@ func NewStore(client *redis.Client, handle codec.Handle, maxCommentIDExpirationS
 	script := redis.NewScript(scriptText)
 
 	return &Store{
-		Client:         client,
-		EncodeBuffer:   &encodeBuffer,
-		Encoder:        encoder,
-		Decoder:        codec.NewDecoderBytes(nil, handle),
-		storeMaxScript: script,
+		Client:                  client,
+		handle:                  handle,
+		storeMaxScript:          script,
+		seenCommentIDExpiration: time.Second * time.Duration(*seenCommentIDExpirationSeconds),
 	}, nil
 }
 
 // DefaultStore creates a store with defaults (default redis & json)
 func DefaultStore() (*Store, error) {
-	return NewStore(defaultRedisClient(), defaultCodecHandle(), nil)
+	return NewStore(defaultRedisClient(), defaultCodecHandle(), nil, nil)
 }
 
 // AddReply pesists a Reply to the store
 func (s *Store) AddReply(reply Reply) (int64, error) {
-	s.EncodeBuffer.Reset()
-
-	if err := s.Encoder.Encode(reply); err != nil {
+	encodeBuffer := bytes.Buffer{}
+	encoder := codec.NewEncoder(&encodeBuffer, s.handle)
+	if err := encoder.Encode(reply); err != nil {
 		return -1, err
 	}
 
-	return s.Client.LPush(repliesKey, s.EncodeBuffer.Bytes()).Result()
+	return s.Client.LPush(repliesKey, encodeBuffer.Bytes()).Result()
 }
 
 // FetchReply retrieves count Reply's from the store
@@ -118,10 +122,12 @@ func (s *Store) FetchReply(count int64) ([]Reply, error) {
 		return []Reply{}, err
 	}
 
+	decoder := codec.NewDecoderBytes(nil, s.handle)
+
 	replies := make([]Reply, len(encodedReplies))
 	for i := 0; i < len(encodedReplies); i++ {
-		s.Decoder.ResetBytes([]byte(encodedReplies[i]))
-		if err := s.Decoder.Decode(&replies[i]); err != nil {
+		decoder.ResetBytes([]byte(encodedReplies[i]))
+		if err := decoder.Decode(&replies[i]); err != nil {
 			return []Reply{}, err
 		}
 	}
@@ -137,15 +143,16 @@ func (s *Store) TrimReplies(count int) error {
 
 // AddReplyWithTrim persists a Reply to the store & trims the list to count atomically
 func (s *Store) AddReplyWithTrim(reply Reply, trimCount int64) (int64, error) {
-	s.EncodeBuffer.Reset()
+	encodeBuffer := bytes.Buffer{}
+	encoder := codec.NewEncoder(&encodeBuffer, s.handle)
 
-	if err := s.Encoder.Encode(reply); err != nil {
+	if err := encoder.Encode(reply); err != nil {
 		return -1, err
 	}
 
 	pipe := s.Client.Pipeline()
 
-	pipe.LPush(repliesKey, s.EncodeBuffer.Bytes())
+	pipe.LPush(repliesKey, encodeBuffer.Bytes())
 	pipe.LTrim(repliesKey, 0, int64(trimCount-1))
 	length := pipe.LLen(repliesKey)
 
@@ -184,4 +191,28 @@ func (s *Store) MaxCommentID() (int64, error) {
 	}
 
 	return ID, err
+}
+
+func processedCommentKey(stringID string) string {
+	return fmt.Sprintf("%s:%s", processedCommentIDPrefix, stringID)
+}
+
+// AddProcessedCommentID marks stringID as processed
+func (s *Store) AddProcessedCommentID(stringID string) error {
+	err := s.Client.Set(processedCommentKey(stringID), true, s.seenCommentIDExpiration).Err()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AlreadyProcessedCommentID checks if stringID has already been processed
+func (s *Store) AlreadyProcessedCommentID(stringID string) (bool, error) {
+	exists, err := s.Client.Exists(processedCommentKey(stringID)).Result()
+	if err != nil {
+		return false, err
+	}
+
+	return exists == 1, nil
 }
