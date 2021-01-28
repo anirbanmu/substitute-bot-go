@@ -3,13 +3,14 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/anirbanmu/substitute-bot-go/pkg/persistence"
-	"github.com/ugorji/go/codec"
-	libsass "github.com/wellington/go-libsass"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/anirbanmu/substitute-bot-go/pkg/persistence"
+	"github.com/ugorji/go/codec"
+	libsass "github.com/wellington/go-libsass"
 )
 
 func compileStyle() (*string, error) {
@@ -87,7 +88,7 @@ func main() {
 		log.Panicf("unable to get style handler: %s", err)
 	}
 
-	store, err := persistence.NewStore(nil, &codec.CborHandle{}, nil)
+	store, err := persistence.NewStore(nil, &codec.CborHandle{}, nil, nil)
 	if err != nil {
 		log.Panicf("unable to get persistence.DefaultStore: %s", err)
 	}

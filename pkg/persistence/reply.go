@@ -1,10 +1,11 @@
 package persistence
 
 import (
-	"github.com/microcosm-cc/bluemonday"
-	"github.com/russross/blackfriday/v2"
 	"html/template"
 	"time"
+
+	"github.com/microcosm-cc/bluemonday"
+	"github.com/russross/blackfriday/v2"
 )
 
 // Reply is the representation of a reddit comment reply that can be stored

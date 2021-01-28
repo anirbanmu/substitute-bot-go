@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/go-redis/redis"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/ugorji/go/codec"
-	"time"
 )
 
 var _ = Describe("persistence", func() {
@@ -53,19 +54,17 @@ var _ = Describe("persistence", func() {
 			Describe("DefaultStore", func() {
 				It("returns a Store with a non-nil client & encoder/decoder", func() {
 					Expect(defaultStore.Client).NotTo(BeNil())
-					Expect(defaultStore.Encoder).NotTo(BeNil())
-					Expect(defaultStore.Decoder).NotTo(BeNil())
+					Expect(defaultStore.handle).NotTo(BeNil())
 				})
 			})
 
 			Describe("NewStore", func() {
 				Context("when no parameters are given", func() {
-					store, err := NewStore(nil, nil, nil)
+					store, err := NewStore(nil, nil, nil, nil)
 					It("returns a Store with a non-nil client & encoder/decoder", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(store.Client).NotTo(BeNil())
-						Expect(store.Encoder).NotTo(BeNil())
-						Expect(store.Decoder).NotTo(BeNil())
+						Expect(store.handle).NotTo(BeNil())
 					})
 				})
 
@@ -77,29 +76,27 @@ var _ = Describe("persistence", func() {
 							DB:       0,  // use default DB
 						})
 
-						store, err := NewStore(client, nil, nil)
+						store, err := NewStore(client, nil, nil, nil)
 						Expect(err).To(HaveOccurred())
 						Expect(store).To(BeNil())
 					})
 				})
 
 				Context("when only client is given", func() {
-					store, err := NewStore(redisClient, nil, nil)
+					store, err := NewStore(redisClient, nil, nil, nil)
 					It("returns a Store with a same client as given & encoder/decoder", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(store.Client).To(Equal(redisClient))
-						Expect(store.Encoder).NotTo(BeNil())
-						Expect(store.Decoder).NotTo(BeNil())
+						Expect(store.handle).NotTo(BeNil())
 					})
 				})
 
 				Context("when only encoding is given", func() {
-					store, err := NewStore(nil, &codec.CborHandle{}, nil)
+					store, err := NewStore(nil, &codec.CborHandle{}, nil, nil)
 					It("returns a Store with a non-nil client & encoder/decoder", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(store.Client).NotTo(BeNil())
-						Expect(store.Encoder).NotTo(BeNil())
-						Expect(store.Decoder).NotTo(BeNil())
+						Expect(store.handle).NotTo(BeNil())
 					})
 				})
 			})
@@ -281,6 +278,49 @@ var _ = Describe("persistence", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(m).To(Equal(int64(100)))
 					})
+				})
+			})
+
+			Describe("AddProcessedCommentID", func() {
+				zeroDuration, _ := time.ParseDuration("0s")
+				setExpirationDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", defaultProcessedCommentIDExpirationSecond))
+
+				Context("when using default expiration", func() {
+					It("set given id with prefix key with proper TTL", func() {
+						err := defaultStore.AddProcessedCommentID("34849")
+						Expect(err).NotTo(HaveOccurred())
+
+						// Make sure expiration is being set
+						exp, err := redisClient.TTL(fmt.Sprintf("%s:%s", processedCommentIDPrefix, "34849")).Result()
+						Expect(err).NotTo(HaveOccurred())
+						Expect(exp).To(SatisfyAll(BeNumerically(">", zeroDuration), BeNumerically("<=", setExpirationDuration)))
+					})
+				})
+			})
+
+			Describe("AlreadyProcessedCommentID", func() {
+				Context("when using default expiration", func() {
+					It("returns true when key exists", func() {
+						err := redisClient.Set(fmt.Sprintf("%s:%s", processedCommentIDPrefix, "34849"), true, 0).Err()
+						Expect(err).NotTo(HaveOccurred())
+
+						exists, err := defaultStore.AlreadyProcessedCommentID("34849")
+						Expect(err).NotTo(HaveOccurred())
+						Expect(exists).To(Equal(true))
+					})
+
+					It("returns false when key doesn't exist", func() {
+						exists, err := defaultStore.AlreadyProcessedCommentID("34849")
+						Expect(err).NotTo(HaveOccurred())
+						Expect(exists).To(Equal(false))
+					})
+				})
+			})
+
+			Describe("processedCommentKey", func() {
+				It("prefixes with proper string", func() {
+					key := processedCommentKey("34849")
+					Expect(key).To(Equal(fmt.Sprintf("%s:%s", processedCommentIDPrefix, "34849")))
 				})
 			})
 		})

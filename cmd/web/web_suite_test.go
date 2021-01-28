@@ -2,12 +2,13 @@ package main
 
 import (
 	"errors"
-	"github.com/anirbanmu/substitute-bot-go/pkg/persistence"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"io/ioutil"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/anirbanmu/substitute-bot-go/pkg/persistence"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 func TestWeb(t *testing.T) {
