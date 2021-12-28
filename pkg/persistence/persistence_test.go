@@ -2,11 +2,12 @@ package persistence
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/ugorji/go/codec"
@@ -41,12 +42,14 @@ var _ = Describe("persistence", func() {
 		repliesJSON[i] = &b
 	}
 
+	ctx := context.Background()
+
 	BeforeEach(func() {
-		Expect(redisClient.FlushDB().Err()).NotTo(HaveOccurred())
+		Expect(redisClient.FlushDB(ctx).Err()).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
-		Expect(redisClient.FlushDB().Err()).NotTo(HaveOccurred())
+		Expect(redisClient.FlushDB(ctx).Err()).NotTo(HaveOccurred())
 	})
 
 	Describe("Store", func() {
@@ -109,7 +112,7 @@ var _ = Describe("persistence", func() {
 					Expect(err).NotTo(HaveOccurred())
 					Expect(replyCount).To(Equal(int64(1)))
 
-					b, err := redisClient.LRange(repliesKey, 0, 0).Result()
+					b, err := redisClient.LRange(ctx, repliesKey, 0, 0).Result()
 					Expect(err).NotTo(HaveOccurred())
 					Expect(bytes.Equal([]byte(b[0]), *repliesJSON[0])).To(BeTrue())
 				})
@@ -118,7 +121,7 @@ var _ = Describe("persistence", func() {
 			Describe("FetchReply", func() {
 				BeforeEach(func() {
 					for i := 0; i < len(repliesJSON); i++ {
-						_, err := redisClient.LPush(repliesKey, *repliesJSON[i]).Result()
+						_, err := redisClient.LPush(ctx, repliesKey, *repliesJSON[i]).Result()
 						Expect(err).NotTo(HaveOccurred())
 					}
 				})
@@ -137,7 +140,7 @@ var _ = Describe("persistence", func() {
 			Describe("TrimReplies", func() {
 				BeforeEach(func() {
 					for i := 0; i < len(repliesJSON); i++ {
-						_, err := redisClient.LPush(repliesKey, *repliesJSON[i]).Result()
+						_, err := redisClient.LPush(ctx, repliesKey, *repliesJSON[i]).Result()
 						Expect(err).NotTo(HaveOccurred())
 					}
 				})
@@ -146,7 +149,7 @@ var _ = Describe("persistence", func() {
 					err := defaultStore.TrimReplies(len(repliesJSON) * 2)
 					Expect(err).NotTo(HaveOccurred())
 
-					count, err := redisClient.LLen(repliesKey).Result()
+					count, err := redisClient.LLen(ctx, repliesKey).Result()
 					Expect(err).NotTo(HaveOccurred())
 					Expect(count).To(Equal(int64(len(repliesJSON))))
 				})
@@ -155,7 +158,7 @@ var _ = Describe("persistence", func() {
 					err := defaultStore.TrimReplies(4)
 					Expect(err).NotTo(HaveOccurred())
 
-					count, err := redisClient.LLen(repliesKey).Result()
+					count, err := redisClient.LLen(ctx, repliesKey).Result()
 					Expect(err).NotTo(HaveOccurred())
 					Expect(count).To(Equal(int64(4)))
 				})
@@ -164,7 +167,7 @@ var _ = Describe("persistence", func() {
 			Describe("AddReplyWithTrim", func() {
 				BeforeEach(func() {
 					for i := 0; i < len(repliesJSON); i++ {
-						_, err := redisClient.LPush(repliesKey, *repliesJSON[i]).Result()
+						_, err := redisClient.LPush(ctx, repliesKey, *repliesJSON[i]).Result()
 						Expect(err).NotTo(HaveOccurred())
 					}
 				})
@@ -175,11 +178,11 @@ var _ = Describe("persistence", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(replyCount).To(Equal(int64(len(repliesJSON) + 1)))
 
-						b, err := redisClient.LRange(repliesKey, 0, 0).Result()
+						b, err := redisClient.LRange(ctx, repliesKey, 0, 0).Result()
 						Expect(err).NotTo(HaveOccurred())
 						Expect(bytes.Equal([]byte(b[0]), *repliesJSON[0])).To(BeTrue())
 
-						count, err := redisClient.LLen(repliesKey).Result()
+						count, err := redisClient.LLen(ctx, repliesKey).Result()
 						Expect(err).NotTo(HaveOccurred())
 						Expect(count).To(Equal(int64(len(repliesJSON) + 1)))
 					})
@@ -191,11 +194,11 @@ var _ = Describe("persistence", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(replyCount).To(Equal(int64(2)))
 
-						b, err := redisClient.LRange(repliesKey, 0, 0).Result()
+						b, err := redisClient.LRange(ctx, repliesKey, 0, 0).Result()
 						Expect(err).NotTo(HaveOccurred())
 						Expect(bytes.Equal([]byte(b[0]), *repliesJSON[0])).To(BeTrue())
 
-						count, err := redisClient.LLen(repliesKey).Result()
+						count, err := redisClient.LLen(ctx, repliesKey).Result()
 						Expect(err).NotTo(HaveOccurred())
 						Expect(count).To(Equal(int64(2)))
 					})
@@ -212,12 +215,12 @@ var _ = Describe("persistence", func() {
 						Expect(err).NotTo(HaveOccurred())
 						Expect(max).To(Equal(int64(34849)))
 
-						m, err := redisClient.Get(maxCommentIDKey).Result()
+						m, err := redisClient.Get(ctx, maxCommentIDKey).Result()
 						Expect(err).NotTo(HaveOccurred())
 						Expect(m).To(Equal("34849"))
 
 						// Make sure expiration is being set
-						exp, err := redisClient.TTL(maxCommentIDKey).Result()
+						exp, err := redisClient.TTL(ctx, maxCommentIDKey).Result()
 						Expect(err).NotTo(HaveOccurred())
 						Expect(exp).To(SatisfyAll(BeNumerically(">", zeroDuration), BeNumerically("<=", setExpirationDuration)))
 					})
@@ -226,19 +229,19 @@ var _ = Describe("persistence", func() {
 				Context("when there is an existing max id", func() {
 					Context("and the existing max id is lower", func() {
 						It("sets given id to max and returns it", func() {
-							_, err := redisClient.Set(maxCommentIDKey, 90, 0).Result()
+							_, err := redisClient.Set(ctx, maxCommentIDKey, 90, 0).Result()
 							Expect(err).NotTo(HaveOccurred())
 
 							max, err := defaultStore.AddNewCommentID("100")
 							Expect(err).NotTo(HaveOccurred())
 							Expect(max).To(Equal(int64(100)))
 
-							m, err := redisClient.Get(maxCommentIDKey).Result()
+							m, err := redisClient.Get(ctx, maxCommentIDKey).Result()
 							Expect(err).NotTo(HaveOccurred())
 							Expect(m).To(Equal("100"))
 
 							// Make sure expiration is being set
-							exp, err := redisClient.TTL(maxCommentIDKey).Result()
+							exp, err := redisClient.TTL(ctx, maxCommentIDKey).Result()
 							Expect(err).NotTo(HaveOccurred())
 							Expect(exp).To(SatisfyAll(BeNumerically(">", zeroDuration), BeNumerically("<=", setExpirationDuration)))
 						})
@@ -246,14 +249,14 @@ var _ = Describe("persistence", func() {
 
 					Context("and the existing max id is higher", func() {
 						It("returns existing id", func() {
-							_, err := redisClient.Set(maxCommentIDKey, 100, 0).Result()
+							_, err := redisClient.Set(ctx, maxCommentIDKey, 100, 0).Result()
 							Expect(err).NotTo(HaveOccurred())
 
 							max, err := defaultStore.AddNewCommentID("90")
 							Expect(err).NotTo(HaveOccurred())
 							Expect(max).To(Equal(int64(100)))
 
-							m, err := redisClient.Get(maxCommentIDKey).Result()
+							m, err := redisClient.Get(ctx, maxCommentIDKey).Result()
 							Expect(err).NotTo(HaveOccurred())
 							Expect(m).To(Equal("100"))
 						})
@@ -271,7 +274,7 @@ var _ = Describe("persistence", func() {
 
 				Context("when there is an existing max id", func() {
 					It("returns id", func() {
-						_, err := redisClient.Set(maxCommentIDKey, 100, 0).Result()
+						_, err := redisClient.Set(ctx, maxCommentIDKey, 100, 0).Result()
 						Expect(err).NotTo(HaveOccurred())
 
 						m, err := defaultStore.MaxCommentID()
@@ -291,7 +294,7 @@ var _ = Describe("persistence", func() {
 						Expect(err).NotTo(HaveOccurred())
 
 						// Make sure expiration is being set
-						exp, err := redisClient.TTL(fmt.Sprintf("%s:%s", processedCommentIDPrefix, "34849")).Result()
+						exp, err := redisClient.TTL(ctx, fmt.Sprintf("%s:%s", processedCommentIDPrefix, "34849")).Result()
 						Expect(err).NotTo(HaveOccurred())
 						Expect(exp).To(SatisfyAll(BeNumerically(">", zeroDuration), BeNumerically("<=", setExpirationDuration)))
 					})
@@ -301,7 +304,7 @@ var _ = Describe("persistence", func() {
 			Describe("AlreadyProcessedCommentID", func() {
 				Context("when using default expiration", func() {
 					It("returns true when key exists", func() {
-						err := redisClient.Set(fmt.Sprintf("%s:%s", processedCommentIDPrefix, "34849"), true, 0).Err()
+						err := redisClient.Set(ctx, fmt.Sprintf("%s:%s", processedCommentIDPrefix, "34849"), true, 0).Err()
 						Expect(err).NotTo(HaveOccurred())
 
 						exists, err := defaultStore.AlreadyProcessedCommentID("34849")

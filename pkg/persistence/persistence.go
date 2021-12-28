@@ -2,12 +2,13 @@ package persistence
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/ugorji/go/codec"
 )
 
@@ -26,6 +27,7 @@ type Store struct {
 	handle                  codec.Handle
 	storeMaxScript          *redis.Script
 	seenCommentIDExpiration time.Duration
+	ctx                     context.Context
 }
 
 func defaultRedisClient() *redis.Client {
@@ -53,8 +55,10 @@ func NewStore(client *redis.Client, handle codec.Handle, maxCommentIDExpirationS
 		client = defaultRedisClient()
 	}
 
+	ctx := context.Background()
+
 	// Test out client to make sure we're good to go
-	_, err := client.Ping().Result()
+	_, err := client.Ping(ctx).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +100,7 @@ func NewStore(client *redis.Client, handle codec.Handle, maxCommentIDExpirationS
 		handle:                  handle,
 		storeMaxScript:          script,
 		seenCommentIDExpiration: time.Second * time.Duration(*seenCommentIDExpirationSeconds),
+		ctx:                     ctx,
 	}, nil
 }
 
@@ -112,12 +117,12 @@ func (s *Store) AddReply(reply Reply) (int64, error) {
 		return -1, err
 	}
 
-	return s.Client.LPush(repliesKey, encodeBuffer.Bytes()).Result()
+	return s.Client.LPush(s.ctx, repliesKey, encodeBuffer.Bytes()).Result()
 }
 
 // FetchReply retrieves count Reply's from the store
 func (s *Store) FetchReply(count int64) ([]Reply, error) {
-	encodedReplies, err := s.Client.LRange(repliesKey, 0, count-1).Result()
+	encodedReplies, err := s.Client.LRange(s.ctx, repliesKey, 0, count-1).Result()
 	if err != nil {
 		return []Reply{}, err
 	}
@@ -137,7 +142,7 @@ func (s *Store) FetchReply(count int64) ([]Reply, error) {
 
 // TrimReplies trims the list of Reply's stored to count
 func (s *Store) TrimReplies(count int) error {
-	_, err := s.Client.LTrim(repliesKey, 0, int64(count-1)).Result()
+	_, err := s.Client.LTrim(s.ctx, repliesKey, 0, int64(count-1)).Result()
 	return err
 }
 
@@ -152,11 +157,11 @@ func (s *Store) AddReplyWithTrim(reply Reply, trimCount int64) (int64, error) {
 
 	pipe := s.Client.Pipeline()
 
-	pipe.LPush(repliesKey, encodeBuffer.Bytes())
-	pipe.LTrim(repliesKey, 0, int64(trimCount-1))
-	length := pipe.LLen(repliesKey)
+	pipe.LPush(s.ctx, repliesKey, encodeBuffer.Bytes())
+	pipe.LTrim(s.ctx, repliesKey, 0, int64(trimCount-1))
+	length := pipe.LLen(s.ctx, repliesKey)
 
-	if _, err := pipe.Exec(); err != nil {
+	if _, err := pipe.Exec(s.ctx); err != nil {
 		return -1, err
 	}
 
@@ -170,7 +175,7 @@ func (s *Store) AddNewCommentID(stringID string) (int64, error) {
 		return -1, err
 	}
 
-	max, err := s.storeMaxScript.Run(s.Client, []string{maxCommentIDKey}, ID).Result()
+	max, err := s.storeMaxScript.Run(s.ctx, s.Client, []string{maxCommentIDKey}, ID).Result()
 	if err != nil {
 		return -1, err
 	}
@@ -180,7 +185,7 @@ func (s *Store) AddNewCommentID(stringID string) (int64, error) {
 
 // MaxCommentID retrieves the last stored max comment id if it exists
 func (s *Store) MaxCommentID() (int64, error) {
-	max, err := s.Client.Get(maxCommentIDKey).Result()
+	max, err := s.Client.Get(s.ctx, maxCommentIDKey).Result()
 	if err != nil {
 		return -1, err
 	}
@@ -199,7 +204,7 @@ func processedCommentKey(stringID string) string {
 
 // AddProcessedCommentID marks stringID as processed
 func (s *Store) AddProcessedCommentID(stringID string) error {
-	err := s.Client.Set(processedCommentKey(stringID), true, s.seenCommentIDExpiration).Err()
+	err := s.Client.Set(s.ctx, processedCommentKey(stringID), true, s.seenCommentIDExpiration).Err()
 	if err != nil {
 		return err
 	}
@@ -209,7 +214,7 @@ func (s *Store) AddProcessedCommentID(stringID string) error {
 
 // AlreadyProcessedCommentID checks if stringID has already been processed
 func (s *Store) AlreadyProcessedCommentID(stringID string) (bool, error) {
-	exists, err := s.Client.Exists(processedCommentKey(stringID)).Result()
+	exists, err := s.Client.Exists(s.ctx, processedCommentKey(stringID)).Result()
 	if err != nil {
 		return false, err
 	}
