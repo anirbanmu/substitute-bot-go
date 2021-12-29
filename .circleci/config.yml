@@ -63,12 +63,6 @@ jobs:
       - image: circleci/golang:1.16
       - image: circleci/redis:latest
 
-  test-go-1.15:
-    <<: *test-defaults
-    docker:
-      - image: circleci/golang:1.15
-      - image: circleci/redis:latest
-
 workflows:
   version: 2
   build:
@@ -76,4 +70,3 @@ workflows:
       - test-go-latest
       - test-go-1.17
       - test-go-1.16
-      - test-go-1.15
