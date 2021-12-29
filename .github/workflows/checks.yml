@@ -1,0 +1,33 @@
+name: checks
+
+on: [push]
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        golang-container-tag: [latest, 1.17, 1.16]
+
+    runs-on: ubuntu-latest
+    container: golang:${{ matrix.golang-container-tag }}
+
+    services:
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Test
+        run: go test -v ./...
+        env:
+          REDIS_URL: redis:6379

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -14,8 +15,12 @@ import (
 )
 
 var _ = Describe("persistence", func() {
+	address := os.Getenv("REDIS_URL")
+	if len(address) == 0 {
+		address = "localhost:6379"
+	}
 	redisClient := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     address,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
