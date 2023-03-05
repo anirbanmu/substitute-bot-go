@@ -20,7 +20,7 @@ This project uses Go modules so please use a version of Go (>= 1.11) that suppor
 - The following environment variables are optional:
   - `SUBSTITUTE_BOT_PORT=<PORT_NUMBER_FOR_WEB_FRONTEND>` (only used by web frontend; defaults to 3000)
 - To run the bot: `go run cmd/bot/main.go`
-- To run the web frontend that shows recent replies: `go run cmd/bot/main.go cmd/bot/index.html.go cmd/bot/style.scss.go`
+- To run the web frontend that shows recent replies: `go run cmd/bot/main.go cmd/bot/index.html.go cmd/bot/style.css.go`
 
 ## Testing
 

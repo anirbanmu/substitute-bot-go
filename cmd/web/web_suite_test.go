@@ -43,15 +43,6 @@ func (r *SuccessfulReplyFetcher) FetchReply(count int64) ([]persistence.Reply, e
 }
 
 var _ = Describe("web", func() {
-	Describe("compileStyle", func() {
-		It("returns compiled CSS & no error", func() {
-			css, err := compileStyle()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(css).NotTo(BeNil())
-			Expect(len(*css)).To(BeNumerically(">", 0))
-		})
-	})
-
 	Describe("getStyleHandler", func() {
 		It("returns CSS", func() {
 			handler, err := getStyleHandler()

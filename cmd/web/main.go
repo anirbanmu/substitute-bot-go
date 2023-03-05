@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"html/template"
 	"log"
@@ -10,34 +9,12 @@ import (
 
 	"github.com/anirbanmu/substitute-bot-go/pkg/persistence"
 	"github.com/ugorji/go/codec"
-	libsass "github.com/wellington/go-libsass"
 )
 
-func compileStyle() (*string, error) {
-	var buf bytes.Buffer
-
-	comp, err := libsass.New(&buf, bytes.NewBufferString(styleScss))
-	if err != nil {
-		return nil, err
-	}
-
-	if err := comp.Run(); err != nil {
-		return nil, err
-	}
-
-	str := buf.String()
-	return &str, nil
-}
-
 func getStyleHandler() (func(http.ResponseWriter, *http.Request), error) {
-	css, err := compileStyle()
-	if err != nil {
-		return nil, err
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-		fmt.Fprintf(w, *css)
+		fmt.Fprintf(w, styleCss)
 	}, nil
 }
 

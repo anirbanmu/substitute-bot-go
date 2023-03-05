@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        golang-container-tag: [latest, 1.17, 1.16]
+        golang-container-tag: [alpine, 1.20.1-alpine]
 
     runs-on: ubuntu-latest
     container: golang:${{ matrix.golang-container-tag }}
@@ -22,7 +22,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Build
         run: go build -v ./...
